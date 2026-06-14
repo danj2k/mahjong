@@ -1249,6 +1249,13 @@ ORG &3000
 .gi_ch
     STA chombo_count, X
     INX: CPX #NUM_PLAYERS: BNE gi_ch
+    \\ Reset per-player kans count
+    LDX #0
+.gi_kans
+    STA player_kans, X
+    INX: CPX #NUM_PLAYERS: BNE gi_kans
+    \\ Reset yakuman flags
+    STA yakuman_flags
     RTS
 \ =============================================
 \ WALL OPERATIONS
@@ -1896,6 +1903,9 @@ ORG &3000
     LDA num_tiles, X
     CMP tmp4
     BCS ek_rm_find \\ if num_tiles >= Y, continue scanning
+    \\ Increment per-player kans count
+    LDX current_player
+    INC player_kans, X
     JMP ep_add     \\ past end of hand
 .ep_add
     \ Calculate offset into opn_melds
@@ -2670,6 +2680,34 @@ ORG &3000
     LDA yaku_flags3: ORA #&04: STA yaku_flags3
 .cs_no_sd
 
+    \\ --- YAKUMAN CHECKS ---
+    LDA #0: STA yakuman_flags
+
+    \\ Check Suukantsu (Four Kans)
+    JSR check_suukantsu
+    BCC cs_no_suuk
+    LDA yakuman_flags: ORA #&01: STA yakuman_flags
+.cs_no_suuk
+
+    \\ Check Daisangen (Big Three Dragons)
+    JSR check_daisangen
+    BCC cs_no_dai
+    LDA yakuman_flags: ORA #&02: STA yakuman_flags
+.cs_no_dai
+
+    \\ Check Chinroutou (All Terminals)
+    JSR check_chinroutou
+    BCC cs_no_chi_rt
+    LDA yakuman_flags: ORA #&04: STA yakuman_flags
+.cs_no_chi_rt
+
+    \\ If any yakuman detected, set han_count to 13 and skip fu calculation
+    LDA yakuman_flags
+    BEQ cs_no_yakuman
+    LDA #13: STA han_count
+    JMP compute_points
+.cs_no_yakuman
+
         JSR calculate_fu
         JSR compute_points
         RTS
@@ -3174,6 +3212,100 @@ ORG &3000
 
 
 \\ =============================================
+\\ YAKUMAN DETECTION
+\\ =============================================
+
+\\ SUUKANTSU: four kans (13 han yakuman)
+\\ Check if current player has declared 4 kans
+.check_suukantsu
+    LDX current_player
+    LDA player_kans, X
+    CMP #4
+    BCS csu_yes
+    CLC
+    RTS
+.csu_yes
+    SEC
+    RTS
+
+\\ Daisangen: big three dragons (13 han yakuman)
+\\ All three dragon triplets (Hatsu=31, Haku=32, Chun=33) must exist
+\\ Checks both hand tiles and open melds
+.check_daisangen
+    JSR build_tile_counts
+    \ Add open meld dragon tiles to counts
+    LDX current_player
+    LDA opn_count, X
+    BEQ cd_check_hand
+    STA tmp8
+    TXA: ASL A: ASL A: STA tmp9
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp9: STA tmp9
+    LDY #0
+.cd_open_lp
+    CPY tmp8: BCS cd_check_hand
+    STY tmp
+    TYA: ASL A: ASL A: CLC: ADC tmp
+    CLC: ADC tmp9: TAX
+    INX
+    LDA opn_melds, X
+    \ Check if it's a dragon tile
+    CMP #31: BCC cd_open_next
+    CMP #34: BCS cd_open_next
+    \ It's a dragon - add 3 to count (triplet in open meld)
+    TAX
+    LDA tile_counts, X: CLC: ADC #3: STA tile_counts, X
+.cd_open_next
+    LDY tmp: INY
+    JMP cd_open_lp
+.cd_check_hand
+    \ Check all three dragons have count >= 3
+    LDX #31
+    LDA tile_counts, X
+    CMP #3
+    BCC cd_no
+    LDX #32
+    LDA tile_counts, X
+    CMP #3
+    BCC cd_no
+    LDX #33
+    LDA tile_counts, X
+    CMP #3
+    BCC cd_no
+    SEC
+    RTS
+.cd_no
+    CLC
+    RTS
+
+\\ Chinroutou: all terminals (13 han yakuman)
+\\ Every tile must be a terminal (1 or 9 of any suit)
+\\ No honor tiles or simple tiles allowed
+.check_chinroutou
+    JSR build_tile_counts
+    LDX #0
+.ccr_loop
+    LDA tile_counts, X
+    BEQ ccr_next
+    \ Check if tile is a terminal (0, 8, 9, 17, 18, 26)
+    CPX #0: BEQ ccr_next
+    CPX #8: BEQ ccr_next
+    CPX #9: BEQ ccr_next
+    CPX #17: BEQ ccr_next
+    CPX #18: BEQ ccr_next
+    CPX #26: BEQ ccr_next
+    \ Not a terminal - fail
+    CLC
+    RTS
+.ccr_next
+    INX
+    CPX #34
+    BNE ccr_loop
+    SEC
+    RTS
+
+
+\\ =============================================
 \\ FU CALCULATION
 \\ =============================================
 
@@ -3549,6 +3681,48 @@ ORG &3000
 
     JSR osnewl
 
+    \\ Check if this is a yakuman hand
+    LDA yakuman_flags
+    BEQ dsr_normal_han
+
+    \\ Display yakuman type
+    LDA yakuman_flags: AND #&01: BEQ dsr_no_suuk
+    LDY #0
+.dsr_suuk
+    LDA yaku_suuk_str, Y: BEQ dsr_suuk_dn
+    JSR oswrch: INY: JMP dsr_suuk
+.dsr_suuk_dn
+    JSR osnewl
+.dsr_no_suuk
+
+    LDA yakuman_flags: AND #&02: BEQ dsr_no_dai
+    LDY #0
+.dsr_dai
+    LDA yaku_dai_str, Y: BEQ dsr_dai_dn
+    JSR oswrch: INY: JMP dsr_dai
+.dsr_dai_dn
+    JSR osnewl
+.dsr_no_dai
+
+    LDA yakuman_flags: AND #&04: BEQ dsr_no_cr
+    LDY #0
+.dsr_cr
+    LDA yaku_cr_str, Y: BEQ dsr_cr_dn
+    JSR oswrch: INY: JMP dsr_cr
+.dsr_cr_dn
+    JSR osnewl
+.dsr_no_cr
+
+    \\ Display YAKUMAN label
+    LDY #0
+.dsr_yk
+    LDA yakuman_str, Y: BEQ dsr_yk_dn
+    JSR oswrch: INY: JMP dsr_yk
+.dsr_yk_dn
+    JSR osnewl: JSR osnewl
+    JMP dsr_score
+
+.dsr_normal_han
     LDY #0
 .dsr_han
     LDA han_lbl, Y: BEQ dsr_han_dn
@@ -3572,6 +3746,8 @@ ORG &3000
     TXA: CLC: ADC #'0': JSR oswrch
     PLA: CLC: ADC #'0': JSR oswrch
     JSR osnewl: JSR osnewl
+
+.dsr_score
 
     LDY #0
 .dsr_sc
@@ -3706,6 +3882,13 @@ ORG &3000
     STA ippatsu_flags, X
     STA furiten_flags, X
     INX: CPX #NUM_PLAYERS: BNE nr_ip
+    \\ Reset per-player kans count
+    LDX #0
+.nr_kans
+    STA player_kans, X
+    INX: CPX #NUM_PLAYERS: BNE nr_kans
+    \\ Reset yakuman flags
+    STA yakuman_flags
     CLC: RTS
 .nr_game_over
     SEC: RTS
@@ -4299,6 +4482,7 @@ ORG &3000
 .yaku_flags EQUB 0
 .yaku_flags2 EQUB 0
 .yaku_flags3 EQUB 0
+.yakuman_flags EQUB 0
 .han_count EQUB 0
 .fu_count EQUB 0
 .hand_closed EQUB 0
@@ -4329,6 +4513,12 @@ ORG &3000
     EQUB 0               \\ first discard is wind for this player?
     NEXT
 .four_kans_count EQUB 0  \\ total kans declared this hand
+
+\\ Per-player kans count (for Suukantsu detection)
+.player_kans
+    FOR I, 0, NUM_PLAYERS-1
+    EQUB 0
+    NEXT
 
 \\ Chombo penalty tracking
 .chombo_count
@@ -4366,6 +4556,16 @@ ORG &3000
     EQUS "HONROUTOU 2 han", 0
 .yaku_sd_str
     EQUS "SANSHOKU DOUKOU 2 han", 0
+
+\\ Yakuman display strings
+.yaku_suuk_str
+    EQUS "SUUKANTSU", 0
+.yaku_dai_str
+    EQUS "DAISANGEN", 0
+.yaku_cr_str
+    EQUS "CHINROUTOU", 0
+.yakuman_str
+    EQUS "YAKUMAN", 0
 
 .end
 SAVE "MAHJONG", start, end, start
