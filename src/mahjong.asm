@@ -1254,6 +1254,8 @@ ORG &3000
     INX: CPX #NUM_PLAYERS: BNE gi_kans
     \\ Reset yakuman flags
     STA yakuman_flags
+    \\ Reset first turn flag
+    LDA #1: STA first_turn
     RTS
 \ =============================================
 \ WALL OPERATIONS
@@ -2725,6 +2727,44 @@ ORG &3000
     LDA yakuman_flags: ORA #&10: STA yakuman_flags
 .cs_no_shouw
 
+    \\ Check Tenhou (Heaven's Win)
+    JSR check_tenhou
+    BCC cs_no_ten
+    LDA yakuman_flags: ORA #&40: STA yakuman_flags
+.cs_no_ten
+
+    \\ Check Chiihou (Earth's Win)
+    JSR check_chiihou
+    BCC cs_no_chi_h
+    LDA yakuman_flags: ORA #&80: STA yakuman_flags
+.cs_no_chi_h
+
+    \\ TENHOU: dealer wins with initial 14 tiles (13 han yakuman)
+.check_tenhou
+    \ Only check if dealer's first turn
+    LDX current_player
+    CPX dealer: BNE cten_no
+    LDA first_turn: BEQ cten_no
+    JSR check_win
+    BCS cten_yes
+.cten_no
+    CLC: RTS
+.cten_yes
+    SEC: RTS
+
+\\ CHIIHOU: non-dealer wins with initial 14 tiles (13 han yakuman)
+.check_chiihou
+    \ Only check if non-dealer's first turn
+    LDX current_player
+    CPX dealer: BEQ cchi_no
+    LDA first_turn: BEQ cchi_no
+    JSR check_win
+    BCS cchi_yes
+.cchi_no
+    CLC: RTS
+.cchi_yes
+    SEC: RTS
+
     \\ If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
     BEQ cs_no_yakuman
@@ -4023,6 +4063,24 @@ ORG &3000
     JSR osnewl
 .dsr_no_shouw
 
+    LDA yakuman_flags: AND #&40: BEQ dsr_no_ten
+    LDY #0
+.dsr_ten
+    LDA yaku_ten_str, Y: BEQ dsr_ten_dn
+    JSR oswrch: INY: JMP dsr_ten
+.dsr_ten_dn
+    JSR osnewl
+.dsr_no_ten
+
+    LDA yakuman_flags: AND #&80: BEQ dsr_no_chi_h
+    LDY #0
+.dsr_chi_h
+    LDA yaku_chi_h_str, Y: BEQ dsr_chi_h_dn
+    JSR oswrch: INY: JMP dsr_chi_h
+.dsr_chi_h_dn
+    JSR osnewl
+.dsr_no_chi_h
+
     \\ Display YAKUMAN label
     LDY #0
 .dsr_yk
@@ -4795,6 +4853,9 @@ ORG &3000
 .yaku_flags2 EQUB 0
 .yaku_flags3 EQUB 0
 .yakuman_flags EQUB 0
+\\ First turn flag for Tenhou/Chiihou detection
+.first_turn
+    EQUB 0
 .han_count EQUB 0
 .fu_count EQUB 0
 .hand_closed EQUB 0
@@ -4884,6 +4945,11 @@ ORG &3000
     EQUS "SHOUSUUSHII", 0
 .yakuman_str
     EQUS "YAKUMAN", 0
+\\ Tenhou/Chiihou display strings
+.yaku_ten_str
+    EQUS "TENHOU", 0
+.yaku_chi_h_str
+    EQUS "CHIIHOU", 0
 
 .tile_counts
     FOR I, 0, 33
