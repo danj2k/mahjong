@@ -50,22 +50,20 @@ tmp8 = &7B
 .disc_tile_player EQUB 0
 
 
-\ Tile count array for meld decomposition (34 bytes)
-\ &7C-&9D: count of each tile type (0-33) in the hand being analyzed
-tile_counts = &7C
-
 \ Meld decomposition result storage
 \\ Temp variable for open call routines
-tmp9 = &9E
-no_seq_flag = &9F
+tmp9 = &80
+no_seq_flag = &81
 
-riichi_declared = &A0       \ per-player riichi flag (4 bytes)
-ippatsu_flags = &A4        \ per-player ippatsu flag (4 bytes)
-furiten_flags = &A8        \ per-player furiten flags (4 bytes)
+\ Per-player flags (moved from OS zero page &A0-&AB to safe zone)
+riichi_declared = &82       \ per-player riichi flag (4 bytes: &82-&85)
+ippatsu_flags = &86        \ per-player ippatsu flag (4 bytes: &86-&89)
+furiten_flags = &8A        \ per-player furiten flags (4 bytes: &8A-&8D)
 \ Bit 0: temporary furiten (cleared on draw)
 \ Bit 1: permanent furiten (set when riichi + discard is winning tile)
 
-\ =============================================
+
+\\ =============================================
 ORG &3000
 \ =============================================
 
@@ -4886,6 +4884,11 @@ ORG &3000
     EQUS "SHOUSUUSHII", 0
 .yakuman_str
     EQUS "YAKUMAN", 0
+
+.tile_counts
+    FOR I, 0, 33
+    EQUB 0
+    NEXT
 
 .end
 SAVE "MAHJONG", start, end, start
