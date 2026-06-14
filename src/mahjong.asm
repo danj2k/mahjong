@@ -646,7 +646,9 @@ ORG &3000
     SEC: RTS
 
 .cck_human_ask
-    \\ Display prompt
+    \ Y = tile index from scan loop. Save it first.
+    STY tmp9
+    \ Display "Declare Closed Kan" prompt
     LDY #0
 .cck_prompt_lp
     LDA closed_kan_ask, Y
@@ -654,13 +656,19 @@ ORG &3000
     JSR osnewl: JSR oswrch: INY
     JMP cck_prompt_lp
 .cck_prompt_dn
+    \ Show which tile: " tile "
+    LDA #' ': JSR oswrch
+    LDA tmp9: JSR tile_num_char: JSR oswrch
+    LDA tmp9: JSR tile_suit_char: JSR oswrch
+    LDA #' ': JSR oswrch
+    \ Wait for key
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ cck_do_it
     CMP #'y': BEQ cck_do_it
-    \\ User said no - continue scanning for other kans
-    \\ For now, return no kan
-    JMP cck_no
+    \ User said no - continue scanning for other kans
+    LDY tmp9
+    JMP cck_scan
 
 .cck_do_it
     JSR execute_closed_kan
@@ -743,7 +751,11 @@ ORG &3000
 .check_added_kan
     LDX current_player
     LDA opn_count, X
-    BEQ cak_no            \\ no open melds
+    BEQ cak_no
+    JMP cak_check
+.cak_no
+    CLC: RTS
+.cak_check
 
     \\ Build tile counts from hand
     JSR build_tile_counts
@@ -784,6 +796,8 @@ ORG &3000
     SEC: RTS
 
 .cak_human_ask
+    \ tmp8 = tile value from scan. Save it.
+    \ Display "Declare Added Kan" prompt
     LDY #0
 .cak_prompt_lp
     LDA added_kan_ask, Y
@@ -791,6 +805,12 @@ ORG &3000
     JSR osnewl: JSR oswrch: INY
     JMP cak_prompt_lp
 .cak_prompt_dn
+    \ Show which tile: " tile "
+    LDA #' ': JSR oswrch
+    LDA tmp8: JSR tile_num_char: JSR oswrch
+    LDA tmp8: JSR tile_suit_char: JSR oswrch
+    LDA #' ': JSR oswrch
+    \ Wait for key
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ cak_do_it
@@ -805,7 +825,6 @@ ORG &3000
     LDY tmp5
     CPY #0: BNE cak_scan
 
-.cak_no
     CLC: RTS
 
 \\ Execute added kan: remove tile from hand, update pon to kan, draw replacement.
@@ -1327,6 +1346,15 @@ ORG &3000
     LDA tile_counts, Y
     CMP #2
     BCC soc_try_chii
+    \ Human player: prompt first
+    LDX tmp5
+    CPX #0
+    BNE soc_pon_ai
+    JSR soc_human_prompt_pon
+    BCC soc_try_chii          \ N = skip pon, try chii
+    JSR execute_pon
+    SEC: RTS
+.soc_pon_ai
     JSR execute_pon
     SEC: RTS
 
@@ -1347,6 +1375,15 @@ ORG &3000
     BCS soc_do_chii
     JMP soc_try_kan
 .soc_do_chii
+    \ Human player: prompt first
+    LDX tmp5
+    CPX #0
+    BNE soc_chii_ai
+    JSR soc_human_prompt_chii
+    BCC soc_try_kan          \ N = skip chii, try kan
+    JSR execute_chii
+    SEC: RTS
+.soc_chii_ai
     JSR execute_chii
     SEC: RTS
 
@@ -1355,6 +1392,15 @@ ORG &3000
     LDA tile_counts, Y
     CMP #3
     BCC soc_skip
+    \ Human player: prompt first
+    LDX tmp5
+    CPX #0
+    BNE soc_kan_ai
+    JSR soc_human_prompt_kan
+    BCC soc_skip              \ N = skip kan
+    JSR execute_kan
+    SEC: RTS
+.soc_kan_ai
     JSR execute_kan
     SEC: RTS
 
@@ -1362,9 +1408,68 @@ ORG &3000
     LDX tmp5
     INX
     CPX #NUM_PLAYERS
-    BNE soc_lp
+    BEQ soc_done
+    JMP soc_lp
+.soc_done
     CLC
     RTS
+
+\ =============================================
+\ HUMAN OPEN CALL PROMPTS
+\ =============================================
+\ Display prompt and read Y/N for open calls.
+\ Returns C set if human said Y, C clear if N.
+
+\ Prompt for Pon
+.soc_human_prompt_pon
+    LDY #0
+.shp_lp
+    LDA pon_ask_str, Y
+    BEQ shp_dn
+    JSR osnewl: JSR oswrch: INY
+    JMP shp_lp
+.shp_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ shp_yes
+    CMP #'y': BEQ shp_yes
+    CLC: RTS
+.shp_yes
+    SEC: RTS
+
+\ Prompt for Chii
+.soc_human_prompt_chii
+    LDY #0
+.shc_lp
+    LDA chii_ask_str, Y
+    BEQ shc_dn
+    JSR osnewl: JSR oswrch: INY
+    JMP shc_lp
+.shc_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ shc_yes
+    CMP #'y': BEQ shc_yes
+    CLC: RTS
+.shc_yes
+    SEC: RTS
+
+\ Prompt for Kan from discard
+.soc_human_prompt_kan
+    LDY #0
+.shk_lp
+    LDA kan_ask_str, Y
+    BEQ shk_dn
+    JSR osnewl: JSR oswrch: INY
+    JMP shk_lp
+.shk_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ shk_yes
+    CMP #'y': BEQ shk_yes
+    CLC: RTS
+.shk_yes
+    SEC: RTS
 
 \ Chii: disc tile as low end (need X+1, X+2)
 .try_chii_low
@@ -2873,6 +2978,15 @@ ORG &3000
 
 .added_kan_ask
     EQUS "Declare Added Kan? (Y/N)", 0
+
+.pon_ask_str
+    EQUS "Pon? (Y/N)", 0
+
+.chii_ask_str
+    EQUS "Chii? (Y/N)", 0
+
+.kan_ask_str
+    EQUS "Kan? (Y/N)", 0
 
 .press_key_str
     EQUS "Press any key...", 0
