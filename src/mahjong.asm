@@ -80,22 +80,53 @@ ORG &3000
 
     JSR player_draw
     BCC ml_draw_ok
+    \ Wall exhausted - drawn game
+    JSR game_display
+    LDY #0
+.draw_msg
+    LDA drawn_str, Y
+    BEQ draw_msg_dn
+    JSR oswrch: INY
+    JMP draw_msg
+.draw_msg_dn
+    JSR osnewl
+    \ Drawn game: dealer stays, honba++, hands_played++
+    INC honba: INC hands_played
+    \ Check game end
+    LDA hands_played
+    CMP #8
+    BCC draw_new
+    SEC: JMP game_over
+.draw_new
+    JSR new_round
+    BCC draw_ok
     JMP game_over
+.draw_ok
+
 .ml_draw_ok
     JSR check_tsumo
     BCC ml_not_tsumo
-    JMP ml_tsumo
+    JSR sort_hand
+    JSR game_display
+    JSR calculate_score
+    JSR display_score_result
+    JSR award_tsumo
+    JSR new_round
+    BCC tsumo_ok
+    JMP game_over
+.tsumo_ok
+
 .ml_not_tsumo
     JSR check_closed_kan
     BCS ml_got_tile
     JSR check_added_kan
     BCS ml_got_tile
-    \\ Check riichi for human player
+    \ Check riichi for human player
     LDX current_player
     CPX #0
-    BNE ml_not_tsumo_ai
+    BNE ml_got_tile
     JSR check_riichi_human
-    BCC ml_not_tsumo_ai
+    BCC ml_got_tile
     \ Riichi declared - auto-discard drawn tile (last in hand)
     LDX num_tiles
     DEX
@@ -106,8 +137,6 @@ ORG &3000
 .ml_no_ron_riichi
     JSR advance_player
     JMP mainloop
-.ml_not_tsumo_ai
-    JMP ml_got_tile
 
 .ml_skip_draw
     LDA #0: STA skip_draw
@@ -120,6 +149,7 @@ ORG &3000
     \ AI turn
     JSR sort_hand
     JSR check_riichi_ai
+    LDX current_player
     JSR ai_choose_discard
     JSR player_discard
     JSR check_ron
@@ -161,9 +191,11 @@ ORG &3000
     JSR game_display
     JSR calculate_score
     JSR display_score_result
-    JSR award_tsumo
+    JSR award_ron
     JSR new_round
-    JMP mainloop
+    BCC ron_ok
+    JMP game_over
+.ron_ok
 
 .ml_ron
     LDX ron_player: STX current_player
@@ -173,6 +205,9 @@ ORG &3000
     JSR display_score_result
     JSR award_ron
     JSR new_round
+    BCC ron_continue
+    JMP game_over
+.ron_continue
     JMP mainloop
 
 .game_over
@@ -184,8 +219,59 @@ ORG &3000
     JSR oswrch: INY
     JMP go_lp
 .go_dn
-    RTS
+    JSR osnewl
+    \ Show final scores
+    JSR disp_points_line
+    JSR osnewl
+    \ Find and display the winner (highest points)
+    LDX #0: STX tmp5          \ tmp5 = highest index
+    LDX #1
+.go_find_lp
+    CPX #NUM_PLAYERS
+    BCS go_show_winner
+    STX tmp6
+    TXA: ASL A: TAX
+    LDA player_points+1, X
+    LDY tmp5: TYA: ASL A: TAY
+    CMP player_points+1, Y
+    BCC go_find_next
+    BNE go_new_high
+    LDA player_points, X
+    CMP player_points, Y
+    BCC go_find_next
+.go_new_high
+    LDX tmp6: STX tmp5
+.go_find_next
+    LDX tmp6: INX
+    JMP go_find_lp
+.go_show_winner
+    LDY #0
+.go_w_lp
+    LDA winner_str, Y
+    BEQ go_w_dn
+    JSR oswrch: INY
+    JMP go_w_lp
+.go_w_dn
+    LDX tmp5
+    TXA: CLC: ADC #'1'
+    JSR oswrch
+    JSR osnewl
+    JSR osnewl
+    LDY #0
+.go_pk
+    LDA press_key_str, Y
+    BEQ go_pk_dn
+    JSR oswrch: INY
+    JMP go_pk
+.go_pk_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    \ Reset game and restart
+    JSR game_init
+    JSR game_display
+    JMP mainloop
 .quit
+    LDA #12: JSR oswrch
     RTS
 
 \ =============================================
@@ -252,6 +338,117 @@ ORG &3000
     BNE adl2
     DEC tmp7
     BNE adl1
+    RTS
+
+\ =============================================
+\ ADVANCE ROUND
+\ =============================================
+\ Called after each hand ends (tsumo/ron).
+\ Updates dealer, seat winds, hands_played.
+\ Returns: C set = game over, C clear = continue.
+\
+\ Rules:
+\ - Dealer won: dealer stays, hands_played++
+\ - Non-dealer won: dealer advances, hands_played++
+\ - Draw: dealer stays, hands_played++, honba++
+\ - Game ends after 8 hands (South 4) unless dealer won
+\   (dealer repeat extends the game)
+
+.advance_round
+    \ Increment hands_played
+    INC hands_played
+
+    \ Determine if it was a draw (wall exhausted)
+    LDA tsumo_flag
+    ORA ron_flag
+    BEQ ar_draw
+
+    \ Was a win - check if dealer won
+    LDA tsumo_flag
+    BNE ar_tsumo
+    \ Ron: winner = ron_player
+    LDX ron_player
+    JMP ar_got_winner
+.ar_tsumo
+    \ Tsumo: winner = current_player
+    LDX current_player
+.ar_got_winner
+    \ Check if winner is dealer
+    CPX dealer
+    BEQ ar_dealer_won
+
+    \ Non-dealer won: advance dealer, reset honba
+    LDA #0: STA honba
+    LDX dealer
+    INX
+    CPX #NUM_PLAYERS
+    BNE ar_no_wrap
+    LDX #0
+.ar_no_wrap
+    STX dealer
+    JMP ar_update_seats
+
+.ar_dealer_won
+    \ Dealer won: stay as dealer, increment honba
+    INC honba
+    JMP ar_update_seats
+
+.ar_draw
+    \ Draw: dealer stays, honba++
+    INC honba
+
+.ar_update_seats
+    \ Calculate seat winds: dealer=East, then clockwise
+    LDX #0
+.ar_seat_lp
+    TXA: CLC: ADC dealer
+    CMP #NUM_PLAYERS
+    BCC ar_no_wrap2
+    SEC: SBC #NUM_PLAYERS
+.ar_no_wrap2
+    TAY                         \ Y = position relative to dealer
+    TXA: CLC: ADC #27          \ East + offset
+    STA seat_winds, Y
+    INX
+    CPX #NUM_PLAYERS
+    BNE ar_seat_lp
+
+    \ Check for game end
+    \ Game ends when hands_played >= 8 (completed South 4)
+    \ unless the dealer just won (extends by one more hand)
+    LDA hands_played
+    CMP #8
+    BCC ar_not_over            \ less than 8 hands: continue
+
+    \ 8+ hands played - check if dealer won (extends game)
+    LDA tsumo_flag
+    ORA ron_flag
+    BEQ ar_not_over           \ draw doesn't extend
+    LDX #0
+    LDA tsumo_flag
+    BNE ar_chk_winner
+    LDX ron_player
+    JMP ar_chk_dealer
+.ar_chk_winner
+    LDX current_player
+.ar_chk_dealer
+    CPX dealer
+    BEQ ar_not_over           \ dealer won: extend game
+
+    \ Non-dealer won at 8+ hands: game over
+    SEC
+    RTS
+
+.ar_not_over
+    \ Safety: end game at 12 hands maximum (South All-Stars limit)
+    LDA hands_played
+    CMP #12
+    BCC ar_continue
+    SEC
+    RTS
+
+.ar_continue
+    CLC
     RTS
 
 \ =============================================
@@ -702,6 +899,12 @@ ORG &3000
     STA dora_indicator
     LDA #0: STA dora_count
     LDA #0: STA current_player
+    LDA #0: STA dealer: STA hands_played
+    \ Initialize seat winds - player 0 is East initially
+    LDA #27: STA seat_winds
+    LDA #28: STA seat_winds+1
+    LDA #29: STA seat_winds+2
+    LDA #30: STA seat_winds+3
     \ Initialize points to 25000 for each player
     LDX #0
 .gi_pts
@@ -1468,9 +1671,56 @@ ORG &3000
     LDA honba
     CLC: ADC #'0'
     JSR oswrch
-    \\ Print dora indicator
+    \\ Print round wind and seat winds
+    JSR osnewl
+    LDA #'R': JSR oswrch
+    LDA #':': JSR oswrch
+    \ Print round wind (East/South based on hands_played)
+    LDA hands_played
+    CMP #4
+    BCC dpl_east
+    LDY #0
+.dpl_s_lp
+    LDA south_str, Y
+    BEQ dpl_s_dn
+    JSR oswrch: INY
+    JMP dpl_s_lp
+.dpl_s_dn
+    JMP dpl_seats
+.dpl_east
+    LDY #0
+.dpl_e_lp
+    LDA east_str, Y
+    BEQ dpl_e_dn
+    JSR oswrch: INY
+    JMP dpl_e_lp
+.dpl_e_dn
+.dpl_seats
+    LDA #' ': JSR oswrch
+    LDA #'S': JSR oswrch
+    LDA #':': JSR oswrch
+    \ Print seat winds (E/S/W/N)
+    LDX #0
+.dpl_sw_lp
+    LDA seat_winds, X
+    SEC: SBC #27
+    TAY
+    LDA seat_wind_chrs, Y
+    JSR oswrch
+    INX
+    CPX #NUM_PLAYERS
+    BNE dpl_sw_lp
+    \ Print dealer marker
     LDA #' ': JSR oswrch
     LDA #'D': JSR oswrch
+    LDA #':': JSR oswrch
+    LDX dealer
+    INX
+    TXA: CLC: ADC #'0'
+    JSR oswrch
+    \\ Print dora indicator
+    LDA #' ': JSR oswrch
+    LDA #'O': JSR oswrch
     LDA #':': JSR oswrch
     LDA dora_indicator
     JSR tile_num_char: JSR oswrch
@@ -2485,22 +2735,31 @@ ORG &3000
 \ =============================================
 
 .new_round
+    \ Advance the round (update dealer, check game end)
+    JSR advance_round
+    BCS nr_game_over
+    \ Clear keyboard buffer and wait for user to see score
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
+    \ Rebuild wall
     JSR wall_build
     JSR wall_shuffle
     JSR deal_all
-    \\ Reveal initial dora indicator from dead wall
+    \ Reveal initial dora indicator from dead wall
     LDA wall+DORA_START
     STA dora_indicator
     LDA #0: STA dora_count
-    LDA #0: STA current_player: STA skip_draw
+    \ Start with the dealer
+    LDX dealer: STX current_player
+    LDA #0: STA skip_draw
     LDA #0: STA tsumo_flag: STA ron_flag
     LDX #0
 .nr_ip
     STA ippatsu_flags, X
     INX: CPX #NUM_PLAYERS: BNE nr_ip
-    RTS
+    CLC: RTS
+.nr_game_over
+    SEC: RTS
 
 \ =============================================
 \ DATA
@@ -2558,6 +2817,16 @@ ORG &3000
 
 .press_key_str
     EQUS "Press any key...", 0
+.drawn_str
+    EQUS "DRAW - Wall Exhausted", 0
+.winner_str
+    EQUS "Winner: Player ", 0
+.east_str
+    EQUS "East", 0
+.south_str
+    EQUS "South", 0
+.seat_wind_chrs
+    EQUS "ESWN"
 
 .honor_nums
     EQUS "ESWNHTC"
@@ -2652,6 +2921,14 @@ ORG &3000
 
 .dora_indicator EQUB 0
 .dora_count EQUB 0
+
+\\ Match structure
+.dealer EQUB 0          \\ current dealer player index (0-3)
+.hands_played EQUB 0   \\ total hands played this game
+.seat_winds
+    FOR I, 0, NUM_PLAYERS-1
+    EQUB 27             \\ seat wind for each player (27=East initially)
+    NEXT
 
 .end
 
