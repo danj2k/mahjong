@@ -70,6 +70,8 @@ ORG &3000
 .start
     LDA #22: JSR oswrch
     LDA #7: JSR oswrch
+    JSR difficulty_select
+    JSR practice_select
     JSR game_init
     JSR game_display
 
@@ -383,9 +385,100 @@ ORG &3000
 .pdck_bad
     CLC: RTS
 
-\ =============================================
-\ TURN MANAGEMENT
-\ =============================================
+\\ =============================================
+\\ PRACTICE MODE HINT
+\\ =============================================
+\\ Shows the best discard option for the human player.
+\\ For each tile in hand, counts how many unique wait tiles remain.
+\\ Displays: "Best discard: X (wait for N tiles)"
+
+.practice_hint
+    TXA: PHA: TYA: PHA
+
+    \\ Find best discard: for each unique tile, count wait tiles after removing it
+    LDA #0: STA tmp       \ best_wait_count
+    LDA #0: STA tmp2      \ best_discard_index
+
+    LDX #0
+.ph_outer
+    CPX num_tiles: BCS ph_done
+    STX tmp3
+
+    \\ Build tile counts, then remove one copy of this tile
+    JSR build_tile_counts
+    LDY tmp3
+    LDA hands, Y: TAX
+    LDA tile_counts, X
+    SEC: SBC #1
+    STA tile_counts, X
+
+    \\ Count unique tile types still present (our wait candidates)
+    LDY #0: STY tmp6
+    LDX #0
+.ph_inner
+    CPX #34: BCS ph_inner_dn
+    LDA tile_counts, X
+    BEQ ph_inner_next
+    INC tmp6
+.ph_inner_next
+    INX: JMP ph_inner
+.ph_inner_dn
+
+    \\ Compare with best
+    LDA tmp6
+    CMP tmp: BCC ph_skip
+    BEQ ph_skip
+    STA tmp
+    LDA tmp3: STA tmp2
+.ph_skip
+    JSR build_tile_counts
+    LDX tmp3
+    INX: JMP ph_outer
+
+.ph_done
+    JSR osnewl
+    LDY #0
+.ph_hdr_lp
+    LDA ph_hdr_str, Y
+    BEQ ph_hdr_dn
+    JSR oswrch: INY
+    JMP ph_hdr_lp
+.ph_hdr_dn
+    LDX tmp2
+    LDA hands, X
+    JSR tile_num_char: JSR oswrch
+    LDA hands, X
+    JSR tile_suit_char: JSR oswrch
+    LDY #0
+.ph_mid_lp
+    LDA ph_mid_str, Y
+    BEQ ph_mid_dn
+    JSR oswrch: INY
+    JMP ph_mid_lp
+.ph_mid_dn
+    LDA tmp
+    CLC: ADC #'0': JSR oswrch
+    LDY #0
+.ph_end_lp
+    LDA ph_end_str, Y
+    BEQ ph_end_dn
+    JSR oswrch: INY
+    JMP ph_end_lp
+.ph_end_dn
+    JSR osnewl
+    PLA: TAY: PLA: TAX
+    RTS
+
+.ph_hdr_str
+    EQUS "Best discard: ", 0
+.ph_mid_str
+    EQUS " (wait for ", 0
+.ph_end_str
+    EQUS " tiles)", 0
+
+\\ =============================================
+\\ TURN MANAGEMENT
+\\ =============================================
 
 .advance_player
     INC current_player
@@ -468,8 +561,16 @@ ORG &3000
     JSR oswrch: INY
     JMP ds_prompt_lp
 .ds_prompt_dn
-    \ Wait for keypress
+    \ Clear keyboard buffer and wait for held keys to expire
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    \ Delay ~100ms (200K cycles at 2MHz) for type_input key to release
+    LDX #0: LDY #8
+.ds_delay
+    DEX: BNE ds_delay
+    DEY: BNE ds_delay
+    \ Clear buffer again after delay
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    \ Wait for keypress
     JSR osrdch
     \ Check 1, 2, 3
     CMP #'1': BEQ ds_novice
@@ -486,6 +587,74 @@ ORG &3000
 .ds_expert
     LDA #2: STA ai_difficulty
 .ds_done
+    RTS
+
+\\ =============================================
+\\ PRACTICE MODE SELECTION
+\\ =============================================
+\\ Display practice mode menu after difficulty selection.
+\\ Stores result in practice_mode (0=off, 1=on).
+\\ Shows hints about optimal discards when enabled.
+
+.practice_select
+    \ Clear screen
+    LDA #12: JSR oswrch
+    \ Display title
+    LDY #0
+.ps_title_lp
+    LDA pract_title, Y
+    BEQ ps_title_dn
+    JSR oswrch: INY
+    JMP ps_title_lp
+.ps_title_dn
+    JSR osnewl: JSR osnewl
+    \ Display option 1: Off
+    LDY #0
+.ps_opt1_lp
+    LDA pract_off, Y
+    BEQ ps_opt1_dn
+    JSR oswrch: INY
+    JMP ps_opt1_lp
+.ps_opt1_dn
+    JSR osnewl
+    \ Display option 2: On
+    LDY #0
+.ps_opt2_lp
+    LDA pract_on, Y
+    BEQ ps_opt2_dn
+    JSR oswrch: INY
+    JMP ps_opt2_lp
+.ps_opt2_dn
+    JSR osnewl: JSR osnewl
+    \ Display prompt
+    LDY #0
+.ps_prompt_lp
+    LDA pract_prompt, Y
+    BEQ ps_prompt_dn
+    JSR osnewl: INY
+    JMP ps_prompt_lp
+.ps_prompt_dn
+    \ Clear keyboard buffer and wait for held keys to expire
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    \ Delay ~100ms for type_input key to release
+    LDX #0: LDY #8
+.ps_delay
+    DEX: BNE ps_delay
+    DEY: BNE ps_delay
+    \ Clear buffer again after delay
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    \ Wait for keypress
+    JSR osrdch
+    \ Check 1, 2
+    CMP #'1': BEQ ps_off
+    CMP #'2': BEQ ps_on
+    \ Invalid - try again
+    JMP ps_prompt_dn
+.ps_off
+    LDA #0: STA practice_mode
+    RTS
+.ps_on
+    LDA #1: STA practice_mode
     RTS
 
 \\ =============================================
@@ -2014,7 +2183,13 @@ ORG &3000
 .gd_hb_dn
     JSR osnewl: JSR osnewl
 
-    \\ Human discards: "Your Disc (X)"
+    \\\\ Practice mode hint
+    LDA practice_mode
+    BEQ gd_skip_hint
+    JSR practice_hint
+.gd_skip_hint
+
+    \\\\ Human discards: "Your Disc (X)"
     LDY #0
 .gd_mydi
     LDA my_disc_str, Y
@@ -4960,6 +5135,16 @@ ORG &3000
         EQUS "3: Expert    - Strategic AI, defensive play", 0
     .diff_prompt
         EQUS "Press 1, 2, or 3:", 0
+.pract_title
+    EQUS "PRACTICE MODE", 0
+.pract_off
+    EQUS "1: OFF - Play without hints", 0
+.pract_on
+    EQUS "2: ON  - Show best discard hints", 0
+.pract_prompt
+    EQUS "Press 1 or 2:", 0
+.practice_mode
+    EQUB 0
 .winner_str
     EQUS "Winner: Player ", 0
 .east_str
