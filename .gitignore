@@ -1,8 +1,9 @@
-# Build outputs (binaries live outside the repo)
+# Build outputs (binaries live outside the repo in ../build/)
 *.ssd
 *.dsd
 *.exe
 *.o
+*.labels
 
 # Editor/IDE files
 *~
