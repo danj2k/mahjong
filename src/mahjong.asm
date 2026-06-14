@@ -1254,6 +1254,7 @@ ORG &3000
     INX: CPX #NUM_PLAYERS: BNE gi_kans
     \\ Reset yakuman flags
     STA yakuman_flags
+    STA yakuman_flags2
     \\ Reset first turn flag
     LDA #1: STA first_turn
     RTS
@@ -2784,6 +2785,14 @@ ORG &3000
     STA yakuman_flags2
 .cs_no_suuank
 
+    \\ Check Chuuren Poutou (Nine Gates)
+    JSR check_chuuren
+    BCC cs_no_chuuren
+    LDA yakuman_flags2
+    ORA #&02
+    STA yakuman_flags2
+.cs_no_chuuren
+
 
     \\ TENHOU: dealer wins with initial 14 tiles (13 han yakuman)
 .check_tenhou
@@ -2864,6 +2873,72 @@ ORG &3000
     CLC: RTS
 .suank_dm_yes
     SEC: RTS
+
+\\ CHUUREN POUTOU: Nine Gates (13 han yakuman)
+\\ Exactly 1-1-1-2-3-4-5-6-7-8-9-9-9 of one suit + any 14th tile of same suit
+.check_chuuren
+    JSR build_tile_counts
+    \\ Try man tiles (0-8)
+    LDY #0
+    JSR cp_check_suit
+    BCS cp_win
+    \\ Try pin tiles (9-17)
+    LDY #9
+    JSR cp_check_suit
+    BCS cp_win
+    \\ Try sou tiles (18-26)
+    LDY #18
+    JSR cp_check_suit
+    BCS cp_win
+    CLC: RTS
+.cp_win
+    SEC: RTS
+
+\\ Check if suit starting at Y forms nine gates pattern
+\\ Y = start tile index (0, 9, or 18)
+\\ Returns C set if this suit is nine gates
+.cp_check_suit
+    STY tmp9
+    \\ Count total tiles in this suit
+    LDX #0
+    LDA #0
+.cp_sum
+    CLC: ADC tile_counts, Y
+    INY
+    INX: CPX #9: BNE cp_sum
+    CMP #14
+    BNE cp_fail
+    \\ Check each tile count matches 9-gates pattern
+    \\ Pattern: 3,1,1,1,1,1,1,1,3 (+ one extra somewhere)
+    LDY tmp9
+    LDX #0
+    LDA #0
+    STA tmp8
+.cp_pat
+    LDA tile_counts, Y
+    \\ Positions 0 and 8 (first and last) must be 3 or 4
+    CPX #0: BEQ cp_edge
+    CPX #8: BEQ cp_edge
+    \\ Inner positions must be 1 or 2
+    CMP #1: BCC cp_fail
+    CMP #3: BCS cp_fail
+    CMP #2: BNE cp_pat_nxt
+    INC tmp8
+    JMP cp_pat_nxt
+.cp_edge
+    CMP #3: BCC cp_fail
+    CMP #5: BCS cp_fail
+    CMP #4: BNE cp_pat_nxt
+    INC tmp8
+.cp_pat_nxt
+    INY: INX: CPX #9: BNE cp_pat
+    \\ Exactly one tile position must have the extra tile
+    LDA tmp8
+    CMP #1
+    BNE cp_fail
+    SEC: RTS
+.cp_fail
+    CLC: RTS
 
     \\ If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
@@ -4196,6 +4271,15 @@ ORG &3000
     JSR osnewl
 .dsr_no_suuank
 
+    LDA yakuman_flags2: AND #&02: BEQ dsr_no_chuuren
+    LDY #0
+.dsr_chuuren
+    LDA yaku_chuuren_str, Y: BEQ dsr_chuuren_dn
+    JSR oswrch: INY: JMP dsr_chuuren
+.dsr_chuuren_dn
+    JSR osnewl
+.dsr_no_chuuren
+
 
     \\ Display YAKUMAN label
     LDY #0
@@ -5087,6 +5171,8 @@ ORG &3000
     EQUS "CHIIHOU", 0
 .yaku_suuank_str
     EQUS "SUUANKOU", 0
+.yaku_chuuren_str
+    EQUS "CHUUREN POUTOU", 0
 
 .tile_counts
     FOR I, 0, 33
