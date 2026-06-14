@@ -25,6 +25,8 @@ INITIAL_HAND = 13
 NUM_PLAYERS = 4
 HAND_SIZE = 14
 MAX_DISC = 24
+MAX_OPEN_MELDS = 4
+MELD_SIZE = 5
 
 \ Zero page
 ptr = &70
@@ -38,13 +40,21 @@ tmp6 = &79
 tmp7 = &7A
 tmp8 = &7B
 
+\ Open call flag - skip draw on next turn
+.skip_draw EQUB 0
+
+\ Last discarded tile info
+.disc_tile_val EQUB 0
+.disc_tile_player EQUB 0
+
+
 \ Tile count array for meld decomposition (34 bytes)
 \ &7C-&9D: count of each tile type (0-33) in the hand being analyzed
 tile_counts = &7C
 
 \ Meld decomposition result storage
-num_waits   = &9E   \ number of waiting tiles
-meld_result = &9F   \ non-zero if hand is a valid win
+\\ Temp variable for open call routines
+tmp9 = &9E
 
 \ =============================================
 ORG &3000
@@ -58,9 +68,17 @@ ORG &3000
 
 \ --- Main loop ---
 .mainloop
+    LDA skip_draw
+    BNE ml_skip_draw
+
     JSR player_draw
     BCS game_over
+    JMP ml_got_tile
 
+.ml_skip_draw
+    LDA #0: STA skip_draw
+
+.ml_got_tile
     LDX current_player
     CPX #0
     BEQ ml_human
@@ -69,9 +87,16 @@ ORG &3000
     JSR sort_hand
     JSR ai_choose_discard
     JSR player_discard
+    JSR check_open_calls
+    BCS ml_call_made
     JSR ai_delay
     JSR game_display
     JSR advance_player
+    JMP mainloop
+
+.ml_call_made
+    JSR ai_delay
+    JSR game_display
     JMP mainloop
 
 .ml_human
@@ -79,7 +104,13 @@ ORG &3000
     JSR game_display
     JSR human_input
     JSR player_discard
+    JSR check_open_calls
+    BCS ml_call_made_h
     JSR advance_player
+    JMP mainloop
+
+.ml_call_made_h
+    JSR game_display
     JMP mainloop
 
 .game_over
@@ -183,8 +214,12 @@ ORG &3000
     STA riichi_sticks, X
     INX: CPX #NUM_PLAYERS: BNE gi_rs
     STA riichi_on_table
+    LDA #0: STA skip_draw
+    LDX #0
+.gi_opn
+    STA opn_count, X
+    INX: CPX #NUM_PLAYERS: BNE gi_opn
     RTS
-
 \ =============================================
 \ WALL OPERATIONS
 \ =============================================
@@ -452,6 +487,315 @@ ORG &3000
     SEC: RTS
 .css_no
     CLC: RTS
+
+\ =============================================
+\ OPEN CALL DETECTION
+\ =============================================
+\ After a discard, check if any other player can claim it.
+\ Per Turn Sequence: check Pon, Chii, Kan.
+\ Returns: C set = call made (current_player changed), C clear = no call.
+
+\ Count tiles for player X into tile_counts.
+.count_tiles_for_player
+    JSR set_hand_ptr
+    LDA #0: LDY #0
+.ctfp_clear
+    STA tile_counts, Y
+    INY: CPY #34: BNE ctfp_clear
+    LDY num_tiles, X
+    BEQ ctfp_done
+    DEY
+.ctfp_loop
+    LDA (ptr), Y
+    PHA: TAX
+    INC tile_counts, X
+    PLA: TAY
+    DEY
+    BPL ctfp_loop
+.ctfp_done
+    RTS
+
+\ Main open call check.
+.check_open_calls
+    LDX disc_tile_player
+    STX tmp7                 \ tmp7 = who discarded
+    LDX #0
+.soc_lp
+    CPX tmp7: BEQ soc_skip
+    STX tmp5                 \ tmp5 = checking player
+    JSR count_tiles_for_player
+
+    \ Check Pon
+    LDY disc_tile_val
+    LDA tile_counts, Y
+    CMP #2
+    BCC soc_try_chii
+    JSR execute_pon
+    SEC: RTS
+
+.soc_try_chii
+    \ Chii only from left player (discarder+1 mod 4)
+    LDA tmp7
+    CLC: ADC #1: AND #3
+    CMP tmp5: BNE soc_try_kan
+    \ Only suited tiles
+    LDA disc_tile_val
+    CMP #27: BCS soc_try_kan
+    \ Try 3 Chii patterns
+    JSR try_chii_low
+    BCS soc_do_chii
+    JSR try_chii_mid
+    BCS soc_do_chii
+    JSR try_chii_high
+    BCS soc_do_chii
+    JMP soc_try_kan
+.soc_do_chii
+    JSR execute_chii
+    SEC: RTS
+
+.soc_try_kan
+    LDY disc_tile_val
+    LDA tile_counts, Y
+    CMP #3
+    BCC soc_skip
+    JSR execute_kan
+    SEC: RTS
+
+.soc_skip
+    LDX tmp5
+    INX
+    CPX #NUM_PLAYERS
+    BNE soc_lp
+    CLC
+    RTS
+
+\ Chii: disc tile as low end (need X+1, X+2)
+.try_chii_low
+    LDA disc_tile_val
+    CLC: ADC #1
+    CMP #27: BCS tcl_no
+    TAX: LDA tile_counts, X
+    BEQ tcl_no
+    LDA disc_tile_val
+    CLC: ADC #2
+    CMP #27: BCS tcl_no
+    TAX: LDA tile_counts, X
+    BEQ tcl_no
+    SEC: RTS
+.tcl_no
+    CLC: RTS
+
+\ Chii: disc tile as middle (need X-1, X+1)
+.try_chii_mid
+    LDA disc_tile_val
+    \ Check lower tile in same suit
+    CMP #9: BCC tcm_man
+    CMP #18: BCC tcm_pin
+    CMP #27: BCC tcm_sou
+    CLC: RTS
+.tcm_man
+    CMP #2: BCC tcm_no     \ need tile >= 2
+    JMP tcm_check
+.tcm_pin
+    CMP #11: BCC tcm_no    \ need tile >= 11
+    JMP tcm_check
+.tcm_sou
+    CMP #20: BCC tcm_no    \ need tile >= 20
+.tcm_check
+    TAX: DEX
+    LDA tile_counts, X
+    BEQ tcm_no
+    LDA disc_tile_val
+    CLC: ADC #1
+    TAX: LDA tile_counts, X
+    BEQ tcm_no
+    SEC: RTS
+.tcm_no
+    CLC: RTS
+
+\ Chii: disc tile as high end (need X-2, X-1)
+.try_chii_high
+    LDA disc_tile_val
+    CMP #9: BCC tch_man
+    CMP #18: BCC tch_pin
+    CMP #27: BCC tch_sou
+    CLC: RTS
+.tch_man
+    CMP #2: BCC tch_no
+    JMP tch_check
+.tch_pin
+    CMP #11: BCC tch_no
+    JMP tch_check
+.tch_sou
+    CMP #20: BCC tch_no
+.tch_check
+    TAX: DEX: DEX
+    LDA tile_counts, X
+    BEQ tch_no
+    INX
+    LDA tile_counts, X
+    BEQ tch_no
+    SEC: RTS
+.tch_no
+    CLC: RTS
+
+\ Execute Pon: claim discarded tile with 2 from hand.
+\ Removes 2 tiles, adds open meld, sets current_player.
+.execute_pon
+    LDX tmp5
+    STX current_player
+    JSR set_hand_ptr
+    \ Find and remove 2 copies of disc_tile_val
+    LDA #0: STA tmp8          \ removal counter
+    LDY #0
+.ep_find
+    STY tmp4
+    LDA num_tiles, X
+    CMP tmp4
+    BCC skp_654
+    JMP ep_add
+.skp_654
+    LDA (ptr), Y
+    CMP disc_tile_val: BNE ep_next
+    INC tmp8
+    LDA tmp8: CMP #2: BEQ ep_rm2
+.ep_next
+    INY: JMP ep_find
+.ep_rm2
+    \ Found 2nd copy at Y-1 (we incremented past it)
+    DEY: JSR ep_remove_at
+    \ Re-find and remove first copy
+    LDX current_player
+    JSR set_hand_ptr
+    LDY #0
+.ep_find2
+    LDA (ptr), Y
+    CMP disc_tile_val: BNE ep_next2
+    JSR ep_remove_at
+    JMP ep_add
+.ep_next2
+    INY: JMP ep_find2
+
+\ Remove tile at position Y from hand (shift left)
+.ep_remove_at
+    LDX current_player
+    STY tmp4
+    LDY num_tiles, X
+    DEY: STY tmp6
+    LDY tmp4
+.ep_rm_lp
+    CPY tmp6: BCS ep_rm_dn
+    INY: LDA (ptr), Y
+    DEY: STA (ptr), Y
+    INY: JMP ep_rm_lp
+.ep_rm_dn
+    DEC num_tiles, X
+    RTS
+
+\ Execute Chii: claim discarded tile with 2 from hand (sequence).
+.execute_chii
+    LDX tmp5
+    STX current_player
+    JSR set_hand_ptr
+    \ Find and remove 2 tiles that form sequence with disc_tile_val
+    \ Try disc+1 and disc+2 first
+    LDA disc_tile_val: CLC: ADC #1
+    STA tmp8                 \ first tile to find
+    LDA disc_tile_val: CLC: ADC #2
+    STA tmp9                 \ second tile to find
+    LDX current_player
+    JSR set_hand_ptr
+    \ Remove tmp8
+    LDY #0
+.ec_find1
+    LDA (ptr), Y
+    CMP tmp8: BNE ec_n1
+    JSR ep_remove_at
+    JMP ec_rm2
+.ec_n1
+    INY: JMP ec_find1
+.ec_rm2
+    \ Re-find hand pointer and remove tmp9
+    LDX current_player
+    JSR set_hand_ptr
+    LDY #0
+.ec_find2
+    LDA (ptr), Y
+    CMP tmp9: BNE ec_n2
+    JSR ep_remove_at
+    JMP ep_add
+.ec_n2
+    INY: JMP ec_find2
+
+\ Execute Kan: claim discarded tile with 3 from hand.
+.execute_kan
+    LDX tmp5
+    STX current_player
+    JSR set_hand_ptr
+    \ Remove 3 copies of disc_tile_val
+    LDA #3: STA tmp8          \ need to remove 3
+.ek_rm_loop
+    LDX current_player
+    JSR set_hand_ptr
+    LDY #0
+.ek_rm_find
+    LDA (ptr), Y
+    CMP disc_tile_val: BNE ek_rm_nxt
+    JSR ep_remove_at
+    DEC tmp8
+    BNE ek_rm_loop
+    \\ All 3 removed, fall through to ep_add
+.ek_rm_nxt
+    INY
+    STY tmp4
+    LDA num_tiles, X
+    CMP tmp4
+    BCS ek_rm_find \\ if num_tiles >= Y, continue scanning
+    JMP ep_add     \\ past end of hand
+.ep_add
+    \ Calculate offset into opn_melds
+    \ offset = player * 20 + count * 5
+    LDX current_player
+    TXA: ASL A: ASL A       \ * 4
+    STA tmp4
+    TXA: ASL A: ASL A: ASL A: ASL A \ * 16
+    CLC: ADC tmp4            \ = * 20
+    STA tmp4                 \ tmp4 = player * 20
+    \ Add count * 5
+    LDX current_player
+    LDY opn_count, X
+    BEQ ep_off_done
+    LDA #0
+.ep_mul5
+    CLC: ADC #5
+    DEY: BNE ep_mul5
+    JMP ep_off_add
+.ep_off_done
+    LDA #0
+.ep_off_add
+    CLC: ADC tmp4            \ + player * 20
+    TAX                      \ X = offset into opn_melds
+    \ Determine meld type from caller
+    \ For now, all calls are pon (type 1)
+    LDA #1
+    STA opn_melds, X
+    INX
+    LDA disc_tile_val
+    STA opn_melds, X
+    STA opn_melds+1, X
+    STA opn_melds+2, X
+    \ Increment meld count
+    LDX current_player
+    INC opn_count, X
+    \ Remove last entry from discard pile
+    JSR set_disc_ptr
+    LDA num_discards, X
+    SEC: SBC #1
+    STA num_discards, X
+    \ Set skip_draw
+    LDA #1
+    STA skip_draw
+    RTS
 
 \ =============================================
 \ DISPLAY
@@ -1032,6 +1376,20 @@ ORG &3000
 
 .riichi_on_table
     EQUB 0
+
+\\ Open melds storage
+\\ 4 players x 4 melds x 5 bytes = 80 bytes
+\\ Each meld: type(1=pon,2=kan), tile1, tile2, tile3, tile4
+.opn_melds
+    FOR I, 0, (MAX_OPEN_MELDS * MELD_SIZE * NUM_PLAYERS)-1
+    EQUB 0
+    NEXT
+
+\\ Number of open melds per player
+.opn_count
+    FOR I, 0, NUM_PLAYERS-1
+    EQUB 0
+    NEXT
 
 .end
 
