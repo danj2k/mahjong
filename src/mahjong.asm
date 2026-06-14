@@ -2611,6 +2611,14 @@ ORG &3000
     LDA yaku_flags2: ORA #&02: STA yaku_flags2
 .cs_no_iip
 
+    \ --- RYANPEIKOU (3 han, closed only) ---
+    LDA hand_closed: BEQ cs_no_ryp
+    JSR check_ryanpeikou
+    BCC cs_no_ryp
+    LDA han_count: CLC: ADC #3: STA han_count
+    LDA yaku_flags2: ORA #&80: STA yaku_flags2
+.cs_no_ryp
+
     \ --- SANSHOKU (1 han) ---
     JSR check_sanshoku
     BCC cs_no_sans
@@ -2968,6 +2976,94 @@ ORG &3000
 .ci_found
     SEC: RTS
 .ci_no
+    CLC: RTS
+
+\ RYANPEIKOU: two pairs of identical sequences (closed only)
+\ Check: find two pairs of identical sequences, remaining must be exactly one pair
+.check_ryanpeikou
+    LDA hand_closed: BEQ crp_no
+    JSR build_tile_counts
+    \ Find first pair of identical sequences
+    LDX #0
+.crp_outer1
+    CPX #27: BCS crp_no
+    LDA tile_counts, X
+    CMP #2: BCC crp_next1
+    INX: LDA tile_counts, X
+    CMP #2: BCC crp_next1b
+    INX: LDA tile_counts, X
+    CMP #2: BCC crp_next1c
+    \ Found first pair at X-2, X-1, X - save X and remove pair
+    STX tmp5
+    TXA: SEC: SBC #2: TAY
+    LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    \ Find second pair of identical sequences
+    LDX #0
+.crp_outer2
+    CPX #27: BCS crp_restore1
+    LDA tile_counts, X
+    CMP #2: BCC crp_next2
+    INX: LDA tile_counts, X
+    CMP #2: BCC crp_next2b
+    INX: LDA tile_counts, X
+    CMP #2: BCC crp_next2c
+    \ Found second pair at X-2, X-1, X - remove pair
+    TXA: SEC: SBC #2: TAY
+    LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    \ Check if remaining is exactly one pair
+    JSR check_single_pair
+    BCS crp_found
+    \ Restore second pair
+    TXA: SEC: SBC #2: TAY
+    LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+.crp_next2c
+    DEX
+.crp_next2b
+    DEX
+.crp_next2
+    INX: JMP crp_outer2
+.crp_restore1
+    \ Restore first pair
+    LDX tmp5
+    TXA: SEC: SBC #2: TAY
+    LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+.crp_next1c
+    DEX
+.crp_next1b
+    DEX
+.crp_next1
+    INX: JMP crp_outer1
+.crp_found
+    SEC: RTS
+.crp_no
+    CLC: RTS
+
+\ Check if tile_counts has exactly one tile with count 2, rest zero
+.check_single_pair
+    LDX #0
+    LDY #0
+.csp_loop
+    CPX #34: BCS csp_done
+    LDA tile_counts, X
+    BEQ csp_next
+    CMP #2: BNE csp_fail
+    INY
+.csp_next
+    INX: JMP csp_loop
+.csp_done
+    CPY #1: BEQ csp_yes
+    CLC: RTS
+.csp_yes
+    SEC: RTS
+.csp_fail
     CLC: RTS
 
 \ SANSHOKU: three identical sequences in different suits
@@ -3799,6 +3895,15 @@ ORG &3000
     JSR osnewl
 .dsr_no_ct
 
+    LDA yaku_flags2: AND #&80: BEQ dsr_no_ryp
+    LDY #0
+.dsr_ryp
+    LDA yaku_ryp_str, Y: BEQ dsr_ryp_dn
+    JSR oswrch: INY: JMP dsr_ryp
+.dsr_ryp_dn
+    JSR osnewl
+.dsr_no_ryp
+
     \\ --- Display yaku_flags3 yaku ---
 
     LDA yaku_flags3: AND #&80: BEQ dsr_no_mt
@@ -4530,6 +4635,8 @@ ORG &3000
     EQUS "SHOU SANGEN", 0
 .yaku_ct_str
     EQUS "CHII TOITSU", 0
+.yaku_ryp_str
+    EQUS "RYANPEIKOU", 0
 .han_lbl
     EQUS "Han: ", 0
 .fu_lbl
