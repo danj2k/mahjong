@@ -109,6 +109,14 @@ ORG &3000
 .ml_draw_ok
     JSR check_tsumo
     BCC ml_not_tsumo
+    \\ Check for illegal tsumo (chombo)
+    JSR check_chombo_win
+    BCC ml_tsumo_valid
+    \\ Invalid tsumo - apply chombo
+    LDX current_player: JSR apply_chombo
+    JSR advance_player
+    JMP mainloop
+.ml_tsumo_valid
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -137,7 +145,15 @@ ORG &3000
     BNE ml_got_tile
     JSR check_riichi_human
     BCC ml_got_tile
-    \ Riichi declared - auto-discard drawn tile (last in hand)
+    \\ Riichi declared - check for illegal riichi (chombo)
+    JSR check_chombo_riichi
+    BCC ml_riichi_ok
+    \\ Illegal riichi - apply chombo penalty
+    LDX current_player: JSR apply_chombo
+    JSR advance_player
+    JMP mainloop
+.ml_riichi_ok
+    \\ Riichi declared - auto-discard drawn tile (last in hand)
     LDX num_tiles
     DEX
     JSR player_discard
@@ -252,6 +268,14 @@ ORG &3000
     JMP mainloop
 .ml_not_triple_ron
     LDX ron_player: STX current_player
+    \\ Check for illegal ron (chombo)
+    JSR check_chombo_win
+    BCC ml_ron_valid
+    \\ Invalid ron - apply chombo
+    LDX current_player: JSR apply_chombo
+    JSR advance_player
+    JMP mainloop
+.ml_ron_valid
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -586,9 +610,40 @@ ORG &3000
 \ RIICHI DECLARATION
 \ =============================================
 \ Check if human player can declare riichi.
-\ Conditions: closed hand (no open melds), 1000+ points, not already declared.
-\ If eligible, prompts Y/N and deducts 1000 points + places riichi stick.
-\ Returns: C set = riichi declared, C clear = no riichi.
+\\ Conditions: closed hand (no open melds), 1000+ points, not already declared.
+\\ If eligible, prompts Y/N and deducts 1000 points + places riichi stick.
+\\ Returns: C set = riichi declared, C clear = no riichi.
+
+\\ =============================================
+\\ CHOMBO CHECK ROUTINES
+\\ =============================================
+\\ Quick checks for illegal plays.
+\\ Returns C set if chombo detected.
+
+\\ Check for illegal riichi
+\\ Returns C set if riichi declared with open hand
+.check_chombo_riichi
+    LDX current_player
+    LDA riichi_declared, X
+    BEQ ccri_not_riichi
+    LDA opn_count, X
+    BEQ ccri_valid
+    \\ Riichi with open hand = chombo
+    SEC: RTS
+.ccri_not_riichi
+    CLC: RTS
+.ccri_valid
+    CLC: RTS
+
+\\ Check for illegal win (tsumo or ron)
+\\ Returns C set if win declared on invalid hand
+.check_chombo_win
+    JSR check_win
+    BCS ccmw_valid
+    \\ Invalid win = chombo
+    SEC: RTS
+.ccmw_valid
+    CLC: RTS
 
 .check_riichi_human
     \ Already declared?
@@ -1189,6 +1244,11 @@ ORG &3000
     STA first_disc_winds+2
     STA first_disc_winds+3
     STA four_kans_count
+    \\ Reset chombo counts
+    LDX #0
+.gi_ch
+    STA chombo_count, X
+    INX: CPX #NUM_PLAYERS: BNE gi_ch
     RTS
 \ =============================================
 \ WALL OPERATIONS
@@ -2067,6 +2127,11 @@ ORG &3000
     LDA #'R': JSR oswrch
     JMP dpl_honba
 .dpl_no_riichi
+    LDA chombo_count, Y
+    BEQ dpl_no_chombo
+    LDA #'C': JSR oswrch
+    JMP dpl_honba
+.dpl_no_chombo
     LDA #' ': JSR oswrch
 .dpl_honba
     LDX tmp5
@@ -3796,8 +3861,99 @@ ORG &3000
     JSR osnewl
     RTS
 
-\\\\\\\\ =============================================
-\\\\\\\\ DATA
+\\ =============================================
+\\ CHOMBO - PENALTY SYSTEM
+\\ =============================================
+\\ Detects illegal plays and applies penalties.
+\\ Violations: illegal riichi, illegal discard, illegal win declaration
+\\ Penalty: 8000 pts (12000 for dealer)
+
+\\ Apply chombo penalty to a player
+\\ X = player number
+\\ Deducts 8000 pts (dealer pays 12000)
+.apply_chombo
+    TXA: PHA
+    INC chombo_count, X
+    \\ Calculate penalty: 8000 (non-dealer) or 12000 (dealer)
+    CPX dealer: BNE apc_non_dealer
+    \\ Dealer penalty: 12000 = &2EE0
+    TXA: ASL A: TAY
+    LDA player_points, Y: SEC: SBC #<12000
+    STA player_points, Y
+    LDA player_points+1, Y: SBC #>12000
+    STA player_points+1, Y
+    JMP apc_check_underflow
+.apc_non_dealer
+    \\ Non-dealer penalty: 8000 = &1F40
+    TXA: ASL A: TAY
+    LDA player_points, Y: SEC: SBC #<8000
+    STA player_points, Y
+    LDA player_points+1, Y: SBC #>8000
+    STA player_points+1, Y
+.apc_check_underflow
+    \\ If points went negative, set to 0
+    LDA player_points+1, Y: BPL apc_done
+    LDA #0: STA player_points, Y: STA player_points+1, Y
+.apc_done
+    \\ Display chombo message
+    JSR game_display
+    LDY #0
+.apc_msg
+    LDA chombo_str, Y: BEQ apc_msg_dn
+    JSR oswrch: INY: JMP apc_msg
+.apc_msg_dn
+    JSR osnewl
+    \\ Show who pays
+    PLA: TAX
+    TXA: CLC: ADC #'1'
+    JSR oswrch
+    LDY #0
+.apc_pay
+    LDA chombo_pay_str, Y: BEQ apc_pay_dn
+    JSR oswrch: INY: JMP apc_pay
+.apc_pay_dn
+    \\ Show penalty amount
+    CPX dealer: BNE apc_show_8k
+    LDA #'1': JSR oswrch
+    LDA #'2': JSR oswrch
+    LDA #'0': JSR oswrch
+    LDA #'0': JSR oswrch
+    LDA #'0': JSR oswrch
+    JMP apc_pts_done
+.apc_show_8k
+    LDA #'8': JSR oswrch
+    LDA #'0': JSR oswrch
+    LDA #'0': JSR oswrch
+    LDA #'0': JSR oswrch
+.apc_pts_done
+    LDA #' ': JSR oswrch
+    LDA #'p': JSR oswrch
+    LDA #'t': JSR oswrch
+    LDA #'s': JSR oswrch
+    JSR osnewl
+    \\ Wait for keypress
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    RTS
+
+\\ Display chombo counts in scoreboard
+.disp_chombo
+    LDX #0
+.dch_lp
+    CPX #NUM_PLAYERS: BCS dch_done
+    LDA chombo_count, X: BEQ dch_next
+    \\ Show "C" marker if player has chombo
+    TXA: CLC: ADC #'1'
+    JSR oswrch
+    LDA #'C': JSR oswrch
+    LDA #' ': JSR oswrch
+.dch_next
+    INX: JMP dch_lp
+.dch_done
+    RTS
+
+\\\\\\\\\\\\\\\\ =============================================
+\\\\\\\\\\\\\\\\ DATA
 \\\\\\\\ =============================================
 
 .title_str
@@ -4013,6 +4169,12 @@ ORG &3000
     NEXT
 .four_kans_count EQUB 0  \\ total kans declared this hand
 
+\\ Chombo penalty tracking
+.chombo_count
+    FOR I, 0, NUM_PLAYERS-1
+    EQUB 0               \\ chombo penalties per player
+    NEXT
+
 .abortive_four_winds_str
     EQUS "ABORTIVE DRAW - Four Winds!", 0
 .abortive_four_kans_str
@@ -4021,6 +4183,10 @@ ORG &3000
     EQUS "ABORTIVE DRAW - Triple Ron!", 0
 .abortive_nine_gates_str
     EQUS "NINE GATES WIN!", 0
+.chombo_str
+    EQUS "CHOMBO - PENALTY!", 0
+.chombo_pay_str
+    EQUS " pays ", 0
 .tenpai_str
     EQUS "TENPAI", 0
 .noten_str
