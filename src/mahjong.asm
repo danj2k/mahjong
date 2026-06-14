@@ -1972,6 +1972,8 @@ ORG &3000
     JSR osnewl
     JSR disp_points_line
     JSR osnewl
+    \\ Blank line between score area and play area
+    JSR osnewl
 
     \ Human hand header
     LDY #0
@@ -1981,13 +1983,6 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_hh
 .gd_hh_dn
-    \ Print seat wind in brackets
-    LDA #' ': JSR oswrch
-    LDA #'(': JSR oswrch
-    LDA seat_winds
-    JSR tile_num_char: JSR oswrch
-    LDA #')': JSR oswrch
-    LDA #':': JSR oswrch
     JSR osnewl
 
     \ Hand top row (numbers/symbols)
@@ -2020,12 +2015,6 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_mydi
 .gd_mydi_dn
-    \ Print seat wind in brackets
-    LDA #' ': JSR oswrch
-    LDA #'(': JSR oswrch
-    LDA seat_winds
-    JSR tile_num_char: JSR oswrch
-    LDA #')': JSR oswrch
     LDA #':': JSR oswrch
     LDX #0
     JSR set_disc_ptr
@@ -2150,6 +2139,17 @@ ORG &3000
     PHA
     TXA: CLC: ADC #'0': JSR oswrch
     PLA: CLC: ADC #'0': JSR oswrch
+    \ Print dealer wind
+    LDY #0
+.gd_dealer_lp
+    LDA gd_dealer_str, Y
+    BEQ gd_dealer_dn
+    JSR oswrch: INY
+    JMP gd_dealer_lp
+.gd_dealer_dn
+    LDX dealer
+    LDA seat_winds, X
+    JSR tile_num_char: JSR oswrch
     RTS
 
 \ =============================================
@@ -4807,6 +4807,9 @@ ORG &3000
 
 .gd_wall_str
     EQUS "  Wall: ", 0
+
+.gd_dealer_str
+    EQUS "  Dealer: ", 0
 
 .honor_nums
     EQUS "ESWNHTC"
