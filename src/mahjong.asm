@@ -2047,21 +2047,37 @@ ORG &3000
     LDX #0
     JSR disp_open_melds
 
-    \ AI discards (players 1-3)
+    \\ AI discards (players 1-3)
     LDX #1
 .gd_disc_lp
     CPX #NUM_PLAYERS: BCS gd_disc_dn
     STX tmp7
-    LDA #'P': JSR oswrch
+    \ Print "CPU P" + player number + " (" + wind + "):"
+    LDY #0
+.gd_cpu_lp
+    LDA gd_cpu_str, Y
+    BEQ gd_cpu_dn
+    JSR oswrch: INY
+    JMP gd_cpu_lp
+.gd_cpu_dn
     TXA: CLC: ADC #'1'
     JSR oswrch
-    \ Print seat wind in brackets
-    PHA
+    LDY #0
+.gd_par_lp
+    LDA gd_par_str, Y
+    BEQ gd_par_dn
+    JSR oswrch: INY
+    JMP gd_par_lp
+.gd_par_dn
     LDA seat_winds, X
     JSR tile_num_char: JSR oswrch
-    PLA
-    LDA #':': JSR oswrch
-    LDA #' ': JSR oswrch
+    LDY #0
+.gd_par2_lp
+    LDA gd_par2_str, Y
+    BEQ gd_par2_dn
+    JSR oswrch: INY
+    JMP gd_par2_lp
+.gd_par2_dn
     JSR set_disc_ptr
     LDX tmp7
     LDY num_discards, X
@@ -2097,6 +2113,37 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_inst
 .gd_done
+    \ Dora and wall count at bottom
+    JSR osnewl
+    LDY #0
+.gd_dora_lp
+    LDA gd_dora_str, Y
+    BEQ gd_dora_dn
+    JSR oswrch: INY
+    JMP gd_dora_lp
+.gd_dora_dn
+    LDA dora_indicator
+    JSR tile_num_char: JSR oswrch
+    LDA dora_indicator
+    JSR tile_suit_char: JSR oswrch
+    LDY #0
+.gd_wall_lp
+    LDA gd_wall_str, Y
+    BEQ gd_wall_dn
+    JSR oswrch: INY
+    JMP gd_wall_lp
+.gd_wall_dn
+    LDA #DORA_START
+    SEC: SBC wall_pos
+    \ Print as 2-digit decimal
+    LDX #0
+.wc10
+    CMP #10: BCC wc10dn
+    SEC: SBC #10: INX: JMP wc10
+.wc10dn
+    PHA
+    TXA: CLC: ADC #'0': JSR oswrch
+    PLA: CLC: ADC #'0': JSR oswrch
     RTS
 
 \ =============================================
@@ -2170,27 +2217,13 @@ ORG &3000
     INX
     TXA: CLC: ADC #'0'
     JSR oswrch
-    \ Print dora indicator
-    LDA #'O': JSR oswrch
-    LDA dora_indicator
-    JSR tile_num_char: JSR oswrch
-    LDA dora_indicator
-    JSR tile_suit_char: JSR oswrch
-    \ Print wall remaining count
+    \ Print riichi sticks on table
     LDA #' ': JSR oswrch
-    LDA #'W': JSR oswrch
+    LDA #'R': JSR oswrch
     LDA #':': JSR oswrch
-    LDA #DORA_START
-    SEC: SBC wall_pos
-    \ Print as 2-digit decimal
-    LDX #0
-.wc10
-    CMP #10: BCC wc10dn
-    SEC: SBC #10: INX: JMP wc10
-.wc10dn
-    PHA
-    TXA: CLC: ADC #'0': JSR oswrch
-    PLA: CLC: ADC #'0': JSR oswrch
+    LDA riichi_on_table
+    CLC: ADC #'0'
+    JSR oswrch
     RTS
 
 \ Print 16-bit value as 5 decimal digits
@@ -4768,6 +4801,21 @@ ORG &3000
     EQUS "South", 0
 .seat_wind_chrs
     EQUS "ESWN"
+
+.gd_cpu_str
+    EQUS "CPU P", 0
+
+.gd_par_str
+    EQUS " (", 0
+
+.gd_par2_str
+    EQUS "): ", 0
+
+.gd_dora_str
+    EQUS "Dora: ", 0
+
+.gd_wall_str
+    EQUS "  Wall: ", 0
 
 .honor_nums
     EQUS "ESWNHTC"
