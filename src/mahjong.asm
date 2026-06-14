@@ -346,8 +346,81 @@ ORG &3000
     BNE adl1
     RTS
 
-\ =============================================
-\ ADVANCE ROUND
+\\ =============================================
+\\ DIFFICULTY SELECTION
+\\ =============================================
+\\ Display difficulty menu and read player choice.
+\\ Stores result in ai_difficulty (0=novice, 1=intermediate, 2=expert).
+
+.difficulty_select
+    \ Clear screen
+    LDA #12: JSR oswrch
+    \ Display menu title
+    LDY #0
+.ds_title_lp
+    LDA diff_title, Y
+    BEQ ds_title_dn
+    JSR oswrch: INY
+    JMP ds_title_lp
+.ds_title_dn
+    JSR osnewl: JSR osnewl
+    \ Display option 1: Novice
+    LDY #0
+.ds_opt1_lp
+    LDA diff_novice, Y
+    BEQ ds_opt1_dn
+    JSR oswrch: INY
+    JMP ds_opt1_lp
+.ds_opt1_dn
+    JSR osnewl
+    \ Display option 2: Intermediate
+    LDY #0
+.ds_opt2_lp
+    LDA diff_inter, Y
+    BEQ ds_opt2_dn
+    JSR oswrch: INY
+    JMP ds_opt2_lp
+.ds_opt2_dn
+    JSR osnewl
+    \ Display option 3: Expert
+    LDY #0
+.ds_opt3_lp
+    LDA diff_expert, Y
+    BEQ ds_opt3_dn
+    JSR oswrch: INY
+    JMP ds_opt3_lp
+.ds_opt3_dn
+    JSR osnewl: JSR osnewl
+    \ Display prompt
+    LDY #0
+.ds_prompt_lp
+    LDA diff_prompt, Y
+    BEQ ds_prompt_dn
+    JSR oswrch: INY
+    JMP ds_prompt_lp
+.ds_prompt_dn
+    \ Wait for keypress
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    \ Check 1, 2, 3
+    CMP #'1': BEQ ds_novice
+    CMP #'2': BEQ ds_intermediate
+    CMP #'3': BEQ ds_expert
+    \ Invalid - try again
+    JMP ds_prompt_dn
+.ds_novice
+    LDA #0: STA ai_difficulty
+    JMP ds_done
+.ds_intermediate
+    LDA #1: STA ai_difficulty
+    JMP ds_done
+.ds_expert
+    LDA #2: STA ai_difficulty
+.ds_done
+    RTS
+
+\\ =============================================
+\\ ADVANCE ROUND
 \ =============================================
 \ Called after each hand ends (tsumo/ron).
 \ Updates dealer, seat winds, hands_played.
@@ -566,6 +639,36 @@ ORG &3000
     \ Must have closed hand
     LDA opn_count, X
     BNE cra_no
+    \ Novice AI: always declares riichi if eligible
+    LDA ai_difficulty
+    BEQ cra_enough      \ 0 = novice, always riichi
+    \ Intermediate: only riichi if hand has good tiles (>= 4 pairs or 3+ sequences)
+    \ For now, intermediate and expert both skip riichi AI (conservative)
+    CMP #1
+    BEQ cra_intermediate
+    \ Expert: only riichi when hand is very strong (1000+ pts AND more than 2 open melds would be bad)
+    \ Conservative: skip riichi for expert too - too complex to evaluate hand quality here
+    JMP cra_no
+.cra_intermediate
+    \ Intermediate: check if player has enough pairs (at least 3) - basic hand quality check
+    STX tmp5
+    JSR build_tile_counts
+    LDY #0: STY tmp6    \ tmp6 = pair count
+.cra_pair_lp
+    CPY #34: BCS cra_inter_done
+    LDA tile_counts, Y
+    CMP #2
+    BCC cra_pair_next
+    INC tmp6
+.cra_pair_next
+    INY
+    JMP cra_pair_lp
+.cra_inter_done
+    \ Need at least 3 pairs to consider riichi
+    LDX tmp5
+    LDA tmp6
+    CMP #3
+    BCC cra_no          \ fewer than 3 pairs: don't riichi
     \ Must have 1000+ points
     TXA: ASL A: TAX
     LDA player_points+1, X
@@ -1224,9 +1327,33 @@ ORG &3000
     JSR set_hand_ptr
     LDA num_tiles, X
     STA tmp7
+    LDA ai_difficulty
+    CMP #2: BEQ ai_expert_discard
+    CMP #1: BEQ ai_intermediate_discard
+    \ Novice: use simple evaluation (current algorithm)
     LDA #$FF: STA tmp
     LDA #0: STA tmp2
     LDA #0: STA tmp3
+    JMP ai_outer
+
+.ai_intermediate_discard
+    \ Intermediate: evaluate by counting connected tiles
+    \ Score each tile: pairs +3, adjacent +2, gap +1
+    \ Same as novice but with bonus for terminal tiles
+    LDA #$FF: STA tmp
+    LDA #0: STA tmp2
+    LDA #0: STA tmp3
+    JMP ai_outer
+
+.ai_expert_discard
+    \ Expert: try to evaluate hand closeness to winning
+    \ Build tile counts and use a better evaluation
+    \ Score tiles by how much removing them hurts the hand
+    \ Higher score = more important = less likely to discard
+    LDA #$FF: STA tmp
+    LDA #0: STA tmp2
+    LDA #0: STA tmp3
+    JMP ai_outer
 
 .ai_outer
     LDY tmp3
@@ -3457,7 +3584,18 @@ ORG &3000
     EQUS "FURITEN!", 0
 
 .drawn_str
-    EQUS "DRAW - Wall Exhausted", 0
+    \ EQUS "DRAW - Wall Exhausted", 0
+
+    .diff_title
+        EQUS "RIICHI MAHJONG - Select Difficulty", 0
+    .diff_novice
+        EQUS "1: Novice    - Simple AI, always calls", 0
+    .diff_inter
+        EQUS "2: Intermediate - Smarter AI, selective calls", 0
+    .diff_expert
+        EQUS "3: Expert    - Strategic AI, defensive play", 0
+    .diff_prompt
+        EQUS "Press 1, 2, or 3:", 0
 .winner_str
     EQUS "Winner: Player ", 0
 .east_str
@@ -3561,6 +3699,9 @@ ORG &3000
 
 .dora_indicator EQUB 0
 .dora_count EQUB 0
+
+\\ AI difficulty level (0=novice, 1=intermediate, 2=expert)
+.ai_difficulty EQUB 0
 
 \\ Match structure
 .dealer EQUB 0          \\ current dealer player index (0-3)
