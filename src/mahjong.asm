@@ -2050,9 +2050,15 @@ ORG &3000
     \\ AI discards (players 1-3)
     LDX #1
 .gd_disc_lp
-    CPX #NUM_PLAYERS: BCS gd_disc_dn
+    CPX #NUM_PLAYERS
+    BNE gd_disc_body
+    JMP gd_disc_dn
+.gd_disc_body
     STX tmp7
-    \ Print "CPU P" + player number + " (" + wind + "):"
+    \ Print 3 spaces indent + "CPU P" + player number + " (" + wind + "):"
+    LDA #' ': JSR oswrch
+    LDA #' ': JSR oswrch
+    LDA #' ': JSR oswrch
     LDY #0
 .gd_cpu_lp
     LDA gd_cpu_str, Y
@@ -2060,7 +2066,7 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_cpu_lp
 .gd_cpu_dn
-    TXA: CLC: ADC #'1'
+    TXA: CLC: ADC #'1'  \ Internal player 1 = display P2
     JSR oswrch
     LDY #0
 .gd_par_lp
@@ -2156,8 +2162,7 @@ ORG &3000
     LDX #0
 .dpl_lp
     STX tmp5
-    \ Print "P" + player number + ":"
-    LDA #'P': JSR oswrch
+    \ Print player number + ":"
     TXA: CLC: ADC #'1': JSR oswrch
     LDA #':': JSR oswrch
     \ Load player's points (16-bit, little-endian)
@@ -2194,30 +2199,16 @@ ORG &3000
     LDX tmp5
     INX
     CPX #NUM_PLAYERS
-    BNE dpl_lp
-    \\ Print honba and round info on one line
+    BEQ dpl_done
+    JMP dpl_lp
+.dpl_done
+    \\ Print honba and riichi sticks
     LDA #' ': JSR oswrch
     LDA #'H': JSR oswrch
     LDA #':': JSR oswrch
     LDA honba
     CLC: ADC #'0'
     JSR oswrch
-    \ Print round wind
-    LDA hands_played
-    CMP #4
-    BCC dpl_east
-    LDA #'S': JSR oswrch
-    JMP dpl_round_dn
-.dpl_east
-    LDA #'E': JSR oswrch
-.dpl_round_dn
-    \ Print dealer number
-    LDA #'D': JSR oswrch
-    LDX dealer
-    INX
-    TXA: CLC: ADC #'0'
-    JSR oswrch
-    \ Print riichi sticks on table
     LDA #' ': JSR oswrch
     LDA #'R': JSR oswrch
     LDA #':': JSR oswrch
