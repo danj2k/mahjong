@@ -1975,15 +1975,20 @@ ORG &3000
     \\ Blank line between score area and play area
     JSR osnewl
 
-    \ Human hand header
-    LDY #0
-.gd_hh
-    LDA hand_hdr_str, Y
-    BEQ gd_hh_dn
-    JSR oswrch: INY
-    JMP gd_hh
-.gd_hh_dn
-    JSR osnewl
+    \\ Human hand header: "Your Hand (X)"
+        LDY #0
+    .gd_hh
+        LDA hand_hdr_str, Y
+        BEQ gd_hh_dn
+        JSR oswrch: INY
+        JMP gd_hh
+    .gd_hh_dn
+        LDA #'(': JSR oswrch
+        LDX #0
+        LDA seat_winds, X
+        JSR tile_num_char: JSR oswrch
+        LDA #')': JSR oswrch
+        JSR osnewl
 
     \ Hand top row (numbers/symbols)
     LDX #0
@@ -2007,7 +2012,7 @@ ORG &3000
 .gd_hb_dn
     JSR osnewl: JSR osnewl
 
-    \ Human discards
+    \\ Human discards: "Your Disc (X)"
     LDY #0
 .gd_mydi
     LDA my_disc_str, Y
@@ -2015,6 +2020,11 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_mydi
 .gd_mydi_dn
+    LDA #'(': JSR oswrch
+    LDX #0
+    LDA seat_winds, X
+    JSR tile_num_char: JSR oswrch
+    LDA #')': JSR oswrch
     LDA #':': JSR oswrch
     LDX #0
     JSR set_disc_ptr
