@@ -1983,6 +1983,7 @@ ORG &3000
         JSR oswrch: INY
         JMP gd_hh
     .gd_hh_dn
+        LDA #' ': JSR oswrch
         LDA #'(': JSR oswrch
         LDX #0
         LDA seat_winds, X
@@ -2020,6 +2021,7 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_mydi
 .gd_mydi_dn
+    LDA #' ': JSR oswrch
     LDA #'(': JSR oswrch
     LDX #0
     LDA seat_winds, X
