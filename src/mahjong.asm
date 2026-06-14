@@ -79,7 +79,7 @@ ORG &3000
 .mainloop
     LDA #0: STA tsumo_flag: STA ron_flag
     LDA skip_draw
-    BNE ml_skip_draw
+    JMP ml_skip_draw
 
     JSR player_draw
     BCC ml_draw_ok
@@ -121,10 +121,17 @@ ORG &3000
 
 .ml_not_tsumo
     JSR check_closed_kan
-    BCS ml_got_tile
+    JMP ml_kan_declared
     JSR check_added_kan
-    BCS ml_got_tile
-    \ Check riichi for human player
+    JMP ml_kan_declared
+    JMP ml_no_kan
+.ml_kan_declared
+    \\ Check for four kans abortive draw
+    JSR check_four_kans
+    JMP ml_abortive
+    JMP ml_got_tile
+.ml_no_kan
+    \\ Check riichi for human player
     LDX current_player
     CPX #0
     BNE ml_got_tile
@@ -157,8 +164,11 @@ ORG &3000
     JSR ai_choose_discard
     JSR player_discard
     JSR check_furiten_after_discard
+    \\ Check for abortive draws after discard
+    JSR check_four_winds
+    JMP ml_abortive
     JSR check_ron
-    BCC ml_not_ron
+    JMP ml_not_ron
     JMP ml_ron
 .ml_not_ron
     JSR check_open_calls
@@ -179,8 +189,11 @@ ORG &3000
     JSR human_input
     JSR player_discard
     JSR check_furiten_after_discard
+    \\ Check for abortive draws after discard
+    JSR check_four_winds
+    JMP ml_abortive
     JSR check_ron
-    BCC ml_not_ron_h
+    JMP ml_not_ron_h
     JMP ml_ron
 .ml_not_ron_h
     JSR check_open_calls
@@ -192,7 +205,30 @@ ORG &3000
     JSR game_display
     JMP mainloop
 
+\\ Abortive draw handler
+.ml_abortive
+    JSR display_abortive_draw
+    JSR new_round
+    BCC abortive_ok
+    JMP game_over
+.abortive_ok
+    JMP mainloop
+
 .ml_tsumo
+    \\ Check for nine gates before handling win
+    JSR check_nine_gates
+    BCC ml_not_nine_gates
+    \\ Nine gates win - display special message
+    JSR display_nine_gates
+    JSR calculate_score
+    JSR display_score_result
+    JSR award_tsumo
+    JSR new_round
+    BCC nine_gates_ok
+    JMP game_over
+.nine_gates_ok
+    JMP mainloop
+.ml_not_nine_gates
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -204,6 +240,17 @@ ORG &3000
 .ron_ok
 
 .ml_ron
+    \\ Check for triple ron before handling
+    JSR check_triple_ron
+    BCC ml_not_triple_ron
+    \\ Triple ron - abortive draw
+    JSR display_abortive_draw
+    JSR new_round
+    BCC triple_ron_ok
+    JMP game_over
+.triple_ron_ok
+    JMP mainloop
+.ml_not_triple_ron
     LDX ron_player: STX current_player
     JSR sort_hand
     JSR game_display
@@ -847,7 +894,8 @@ ORG &3000
 
     \\ Reveal new dora indicator
     JSR reveal_dora
-
+    \\ Increment four kans counter
+    INC four_kans_count
     RTS
 
 \\ Check if current player can declare an added kan (4th tile for an open pon).
@@ -1011,7 +1059,8 @@ ORG &3000
 
     \\ Reveal new dora indicator
     JSR reveal_dora
-
+    \\ Increment four kans counter
+    INC four_kans_count
     SEC: RTS
 
 \\ Reveal next dora indicator from dead wall.
@@ -1133,6 +1182,13 @@ ORG &3000
 .gi_opn
     STA opn_count, X
     INX: CPX #NUM_PLAYERS: BNE gi_opn
+    \\ Initialize abortive draw counters
+    LDA #0
+    STA first_disc_winds
+    STA first_disc_winds+1
+    STA first_disc_winds+2
+    STA first_disc_winds+3
+    STA four_kans_count
     RTS
 \ =============================================
 \ WALL OPERATIONS
@@ -1821,9 +1877,11 @@ ORG &3000
     LDA num_discards, X
     SEC: SBC #1
     STA num_discards, X
-    \ Set skip_draw
+    \\ Set skip_draw
     LDA #1
     STA skip_draw
+    \\ Increment four kans counter
+    INC four_kans_count
     RTS
 
 \ =============================================
@@ -3501,9 +3559,246 @@ ORG &3000
 .dom_done
     RTS
 
-\ =============================================
-\ DATA
-\ =============================================
+\\\\ =============================================
+\\\\ ABORTIVE DRAWS
+\\\\ =============================================
+\\\\ Check for abortive draw conditions after each discard.
+\\\\ Returns: C set = abortive draw, C clear = normal play.
+\\\\ When abortive draw detected, displays message and handles draw resolution.
+
+\\\\ Check Four Winds (Suu Fon Round)
+\\\\ All 4 players discard wind tiles on the first turn (turn 1)
+.check_four_winds
+    \\ Only check after 4 players have each discarded once
+    LDA num_discards
+    CMP #1
+    BNE cfw_no
+    LDA num_discards+1
+    CMP #1
+    BNE cfw_no
+    LDA num_discards+2
+    CMP #1
+    BNE cfw_no
+    LDA num_discards+3
+    CMP #1
+    BNE cfw_no
+    \\ All players have 1 discard - check if all are winds
+    \\ Player 0 first discard at disc_bases+0
+    LDA disc_bases
+    CMP #27
+    BCC cfw_no
+    CMP #31
+    BCS cfw_no
+    \\ Player 1 first discard at disc_bases+2 -> discards+MAX_DISC
+    LDA disc_bases+2
+    CMP #27
+    BCC cfw_no
+    CMP #31
+    BCS cfw_no
+    \\ Player 2 first discard at disc_bases+4 -> discards+MAX_DISC*2
+    LDA disc_bases+4
+    CMP #27
+    BCC cfw_no
+    CMP #31
+    BCS cfw_no
+    \\ Player 3 first discard at disc_bases+6 -> discards+MAX_DISC*3
+    LDA disc_bases+6
+    CMP #27
+    BCC cfw_no
+    CMP #31
+    BCS cfw_no
+    \\ All 4 first discards are winds!
+    JSR game_display
+    LDY #0
+.cfw_msg_lp
+    LDA abortive_four_winds_str, Y
+    BEQ cfw_msg_dn
+    JSR oswrch: INY
+    JMP cfw_msg_lp
+.cfw_msg_dn
+    JSR osnewl
+    SEC
+    RTS
+.cfw_no
+    CLC
+    RTS
+
+\\\\ Check Four Kans (Suu Kan)
+\\\\ When 4 kans have been declared total by all players
+.check_four_kans
+    LDA four_kans_count
+    CMP #4
+    BCC cfk_no
+    JSR game_display
+    LDY #0
+.cfk_msg_lp
+    LDA abortive_four_kans_str, Y
+    BEQ cfk_msg_dn
+    JSR oswrch: INY
+    JMP cfk_msg_lp
+.cfk_msg_dn
+    JSR osnewl
+    SEC
+    RTS
+.cfk_no
+    CLC
+    RTS
+
+\\\\ Check Triple Ron (San Kan Ron)
+\\\\ Two or more players can win on the same discard
+\\\\ Returns C set if multiple ron claims detected
+.check_triple_ron
+    LDA ron_flag: PHA
+    LDA ron_player: PHA
+    \\ First, do a normal ron check
+    JSR check_ron
+    BCC ctr_no_ron
+    \\ One ron found - check for more
+    LDA ron_player: STA tmp5
+    LDX ron_player: INX
+.ctr_loop
+    CPX disc_tile_player: BEQ ctr_next
+    STX tmp6
+    JSR count_tiles_for_player
+    LDY disc_tile_val
+    LDA tile_counts, Y: CLC: ADC #1: STA tile_counts, Y
+    JSR check_win_no_rebuild
+    BCS ctr_second_found
+    LDY disc_tile_val
+    LDA tile_counts, Y: SEC: SBC #1: STA tile_counts, Y
+.ctr_next
+    LDX tmp6: INX
+    CPX #NUM_PLAYERS: BNE ctr_loop
+    \\ Only one ron found - not triple ron
+    PLA: STA ron_player
+    PLA: STA ron_flag
+    CLC
+    RTS
+.ctr_second_found
+    \\ Two rons found = abortive draw
+    PLA: STA ron_player
+    PLA: STA ron_flag
+    JSR game_display
+    LDY #0
+.ctr_msg_lp
+    LDA abortive_triple_ron_str, Y
+    BEQ ctr_msg_dn
+    JSR oswrch: INY
+    JMP ctr_msg_lp
+.ctr_msg_dn
+    JSR osnewl
+    SEC
+    RTS
+.ctr_no_ron
+    PLA: STA ron_player
+    PLA: STA ron_flag
+    CLC
+    RTS
+
+\\\\ Check Nine Gates (Kyuu Shuu Kyuu Hai)
+\\\\ Pattern: 1-1-1-2-3-4-5-6-7-8-9-9-9 of one suit + 14th tile
+\\\\ Only for closed hands with 14 tiles
+.check_nine_gates
+    LDX current_player
+    LDA num_tiles, X
+    CMP #14
+    BNE cng_no
+    \\ Check if hand is closed (no open melds)
+    LDA opn_count, X
+    BNE cng_no
+    \\ Build tile counts
+    JSR build_tile_counts
+    \\ Check each suit: Man(0-8), Pin(9-17), Sou(18-26)
+    LDX #0
+.cng_suit_lp
+    STX tmp5
+    JSR cng_check_suit
+    BCS cng_found
+    LDX tmp5
+    INX
+    CPX #3
+    BNE cng_suit_lp
+    CLC
+    RTS
+.cng_found
+    SEC
+    RTS
+.cng_no
+    CLC
+    RTS
+
+\\\\ Check if a specific suit matches the 9-gate pattern
+\\\\ X = suit index (0=Man, 1=Pin, 2=Sou)
+\\\\ Returns C set if pattern matches
+.cng_check_suit
+    TXA
+    ASL A: ASL A: ASL A: ASL A
+    TAX
+    \\ X = base tile value for suit (0, 9, or 18)
+    LDY #0
+    STY tmp6
+    \\ Check tile X+0 (1) has at least 3
+    LDA tile_counts, X
+    CMP #3
+    BCC cng_no_match
+    CLC: ADC tmp6: STA tmp6
+    \\ Check tiles X+1 through X+8 have at least 1 each
+    INX
+.cng_mid_lp
+    LDA tile_counts, X
+    BEQ cng_no_match
+    CLC: ADC tmp6: STA tmp6
+    INX
+    CPX #9
+    BCC cng_mid_lp
+    \\ Now X is at X+9 (the 9 tile)
+    LDA tile_counts, X
+    CMP #3
+    BCC cng_no_match
+    CLC: ADC tmp6: STA tmp6
+    \\ Total should be 14
+    LDA tmp6
+    CMP #14
+    BNE cng_no_match
+    SEC
+    RTS
+.cng_no_match
+    CLC
+    RTS
+
+\\\\ =============================================
+\\\\ DISPLAY ROUTINES FOR ABORTIVE DRAWS
+\\\\ =============================================
+
+\\\\ Display abortive draw message and handle draw resolution
+\\\\ This is called when any abortive draw condition is detected
+.display_abortive_draw
+    \\ The message was already displayed by the check routine
+    \\ Now handle the draw resolution
+    INC honba: INC hands_played
+    LDA hands_played
+    CMP #8
+    BCC dad_new
+    SEC: RTS
+.dad_new
+    JSR new_round
+    RTS
+
+\\\\ Display nine gates win message
+.display_nine_gates
+    LDY #0
+.dng_lp
+    LDA abortive_nine_gates_str, Y
+    BEQ dng_dn
+    JSR oswrch: INY
+    JMP dng_lp
+.dng_dn
+    JSR osnewl
+    RTS
+
+\\\\\\\\ =============================================
+\\\\\\\\ DATA
+\\\\\\\\ =============================================
 
 .title_str
     EQUS "RIICHI MAHJONG", 0
@@ -3711,6 +4006,28 @@ ORG &3000
     EQUB 27             \\ seat wind for each player (27=East initially)
     NEXT
 
-.end
+\\\\ Abortive draw tracking
+.first_disc_winds
+    FOR I, 0, NUM_PLAYERS-1
+    EQUB 0               \\ first discard is wind for this player?
+    NEXT
+.four_kans_count EQUB 0  \\ total kans declared this hand
 
+.abortive_four_winds_str
+    EQUS "ABORTIVE DRAW - Four Winds!", 0
+.abortive_four_kans_str
+    EQUS "ABORTIVE DRAW - Four Kans!", 0
+.abortive_triple_ron_str
+    EQUS "ABORTIVE DRAW - Triple Ron!", 0
+.abortive_nine_gates_str
+    EQUS "NINE GATES WIN!", 0
+.tenpai_str
+    EQUS "TENPAI", 0
+.noten_str
+    EQUS "NOTEN", 0
+.tenpai_pay_str
+    EQUS " pays ", 0
+.pts_str
+    EQUS " pts", 0
+.end
 SAVE "MAHJONG", start, end, start
