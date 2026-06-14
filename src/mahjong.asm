@@ -2281,7 +2281,7 @@ ORG &3000
 \ Main scoring entry point
 .calculate_score
     LDA #0
-    STA han_count: STA fu_count: STA yaku_flags
+    STA han_count: STA fu_count: STA yaku_flags: STA yaku_flags2
     JSR build_tile_counts
 
     \ Determine if hand is closed
@@ -2334,10 +2334,67 @@ ORG &3000
     INC han_count
     LDA yaku_flags: ORA #&02: STA yaku_flags
 .cs_no_pin
+    \ --- IPPATSU (1 han, closed, riichi + ippatsu flag) ---
+    LDX current_player
+    LDA hand_closed: BEQ cs_no_ipp
+    LDA riichi_on_table, X
+    AND #1: BEQ cs_no_ipp
+    LDA ippatsu_flags, X
+    BEQ cs_no_ipp
+    INC han_count
+    LDA yaku_flags2: ORA #&01: STA yaku_flags2
+.cs_no_ipp
+    LDA hand_closed: BEQ cs_no_iip
+    JSR check_iipeiko
+    BCC cs_no_iip
+    INC han_count
+    LDA yaku_flags2: ORA #&02: STA yaku_flags2
+.cs_no_iip
 
-    JSR calculate_fu
-    JSR compute_points
-    RTS
+    \ --- SANSHOKU (1 han) ---
+    JSR check_sanshoku
+    BCC cs_no_sans
+    INC han_count
+    LDA yaku_flags2: ORA #&04: STA yaku_flags2
+.cs_no_sans
+
+    \ --- ITTSU (2 han) ---
+    JSR check_ittsu
+    BCC cs_no_itt
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags2: ORA #&08: STA yaku_flags2
+.cs_no_itt
+
+    \ --- CHANTA (2 han closed / 1 han open) ---
+    JSR check_chanta
+    BCC cs_no_cha
+    LDA hand_closed
+    BEQ cs_cha_open
+    LDA han_count: CLC: ADC #2: STA han_count
+    JMP cs_cha_set
+.cs_cha_open
+    INC han_count
+.cs_cha_set
+    LDA yaku_flags2: ORA #&10: STA yaku_flags2
+.cs_no_cha
+
+    \ --- SHOU SANGEN (2 han) ---
+    JSR check_shousangen
+    BCC cs_no_ss
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags2: ORA #&20: STA yaku_flags2
+.cs_no_ss
+
+    \ --- CHII TOITSU (2 han) ---
+    JSR check_chitoitsu
+    BCC cs_no_ct
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags2: ORA #&40: STA yaku_flags2
+.cs_no_ct
+
+        JSR calculate_fu
+        JSR compute_points
+        RTS
 
 \ =============================================
 \ YAKU DETECTION
@@ -2532,6 +2589,217 @@ ORG &3000
     INX: CPX #34: BNE cp_pair
 .cp_no
     CLC: RTS
+
+\ =============================================
+\ NEW YAKU DETECTION (7 additional yaku)
+\ =============================================
+
+\ IIPPEIKO: two identical sequences (closed only)
+\ Check: find a sequence (i, i+1, i+2), then check if the same sequence exists again
+.check_iipeiko
+    LDA hand_closed: BEQ ci_no
+    JSR build_tile_counts
+.ci_restart
+    LDX #0
+.ci_outer
+    CPX #27: BCS ci_no
+    LDA tile_counts, X
+    CMP #2: BCC ci_next
+    \ Check for sequence starting at X
+    INX: LDA tile_counts, X
+    CMP #2: BCC ci_next2
+    INX: LDA tile_counts, X
+    CMP #2: BCC ci_next3
+    \ Found first sequence at X-2, X-1, X
+    \ Check for second identical sequence
+    TXA: SEC: SBC #2: TAY
+    \ Remove first sequence temporarily
+    LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
+    \ Now check if remaining tiles form valid hand (3 melds + 1 pair)
+    JSR decompose_melds
+    BCS ci_found
+    \ Restore first sequence
+    TXA: SEC: SBC #2: TAY
+    LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+    INY: LDA tile_counts, Y: CLC: ADC #2: STA tile_counts, Y
+.ci_next3
+    DEX
+.ci_next2
+    DEX
+.ci_next
+    INX: JMP ci_outer
+.ci_found
+    SEC: RTS
+.ci_no
+    CLC: RTS
+
+\ SANSHOKU: three identical sequences in different suits
+\ Check: for each sequence (1-9) in man suit, check if same exists in pin and sou
+.check_sanshoku
+    JSR build_tile_counts
+    LDY #0
+.cs_outer
+    CPY #9: BCS cs_no
+    LDA tile_counts, Y
+    BEQ cs_next
+    INY: LDA tile_counts, Y
+    BEQ cs_next2
+    INY: LDA tile_counts, Y
+    BEQ cs_next3
+    \ Found sequence in man (Y-2, Y-1, Y)
+    \ Check pin (Y+7, Y+8, Y+9)
+    TYA: CLC: ADC #7: TAX
+    LDA tile_counts, X: BEQ cs_no_seq
+    INX: LDA tile_counts, X: BEQ cs_no_seq
+    INX: LDA tile_counts, X: BEQ cs_no_seq
+    \ Check sou (Y+16, Y+17, Y+18)
+    TYA: CLC: ADC #16: TAX
+    LDA tile_counts, X: BEQ cs_no_seq
+    INX: LDA tile_counts, X: BEQ cs_no_seq
+    INX: LDA tile_counts, X: BEQ cs_no_seq
+    SEC: RTS
+.cs_no_seq
+    DEY
+.cs_next3
+    DEY
+.cs_next2
+    DEY
+.cs_next
+    INY: JMP cs_outer
+.cs_no
+    CLC: RTS
+
+\ ITTSU (Straight): sequences 123, 456, 789 in one suit
+.check_ittsu
+    JSR build_tile_counts
+    \ Try man suit (0-8)
+    LDX #0: JSR ci_check_straight: BCS ci_yes
+    \ Try pin suit (9-17)
+    LDX #9: JSR ci_check_straight: BCS ci_yes
+    \ Try sou suit (18-26)
+    LDX #18: JSR ci_check_straight
+.ci_yes
+    RTS
+
+\ Helper: check if suit starting at X has 123, 456, 789
+.ci_check_straight
+    STX tmp
+    LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    LDX tmp: TXA: CLC: ADC #3: TAX
+    LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    LDX tmp: TXA: CLC: ADC #6: TAX
+    LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    INX: LDA tile_counts, X: BEQ ci_cs_no
+    SEC: RTS
+.ci_cs_no
+    CLC: RTS
+
+\ CHANTA: all melds contain terminals/honors, pair is terminal/honor
+.check_chanta
+    JSR build_tile_counts
+    \ Find the pair - must be terminal or honor
+    LDX #0
+.ct_pair
+    LDA tile_counts, X
+    CMP #2: BNE ct_pnext
+    JSR is_terminal_or_honor
+    BCC ct_pnext
+    \ Pair is terminal/honor, now check all melds
+    \ Temporarily remove pair
+    TXA: PHA
+    LDA tile_counts, X: SEC: SBC #2: STA tile_counts, X
+    PLA: TAX
+    \ Check all remaining melds contain terminals/honors
+    LDY #0
+.ct_mcheck
+    CPY #34: BCS ct_mcheck_done
+    LDA tile_counts, Y
+    BEQ ct_mcheck_next
+    JSR is_terminal_or_honor
+    BCC ct_mcheck_fail
+.ct_mcheck_next
+    INY: JMP ct_mcheck
+.ct_mcheck_done
+    \ Restore pair
+    LDX #0
+.ct_restore
+    LDA tile_counts, X
+    CMP #2: BNE ct_rnext
+    TXA: PHA
+    LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
+    PLA: TAX
+    SEC: RTS
+.ct_rnext
+    INX: JMP ct_restore
+.ct_pnext
+    INX: CPX #34: BNE ct_pair
+    CLC: RTS
+.ct_mcheck_fail
+.ct_restore2
+    LDA tile_counts, X
+    CMP #2: BNE ct_r2next
+    TXA: PHA
+    LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
+    PLA: TAX
+    CLC: RTS
+.ct_r2next
+    INX: JMP ct_restore2
+
+\ SHOU SANGEN: two dragon triplets + dragon pair (or three dragon triplets)
+.check_shousangen
+    LDA #0: STA tmp
+    JSR build_tile_counts
+    \ Check dragons 31(Hatsu), 32(Haku), 33(Chun)
+    LDX #31: LDA tile_counts, X: CMP #3: BCS cs_d3
+    LDX #32: LDA tile_counts, X: CMP #3: BCS cs_d3
+    CLC: RTS
+.cs_d3
+    \ Count dragon triplets and pairs
+    LDX #31: LDA tile_counts, X: CMP #3: BCS cs_d3a
+    CMP #2: BCC cs_d3a
+    INC tmp
+.cs_d3a
+    LDX #32: LDA tile_counts, X: CMP #3: BCS cs_d3b
+    CMP #2: BCC cs_d3b
+    INC tmp
+.cs_d3b
+    LDX #33: LDA tile_counts, X: CMP #3: BCS cs_d3c
+    CMP #2: BCC cs_d3c
+    INC tmp
+.cs_d3c
+    \ Need at least 2 dragon groups (triplets or pairs)
+    LDA tmp
+    CMP #2: BCS cs_ss_yes
+    CLC: RTS
+.cs_ss_yes
+    SEC: RTS
+
+\ CHII TOITSU: seven pairs (2 han)
+.check_chitoitsu
+    JSR build_tile_counts
+    LDX #0: STX tmp
+.ct_pair2
+    LDA tile_counts, X
+    CMP #2: BEQ ct_ppair
+    CMP #4: BEQ ct_ppair
+    CLC: RTS
+.ct_ppair
+    INC tmp
+    INX: CPX #34: BNE ct_pair2
+    LDA tmp
+    CMP #7: BNE ct_no7
+    SEC: RTS
+.ct_no7
+    CLC: RTS
+
 
 \ =============================================
 \ FU CALCULATION
@@ -2804,6 +3072,71 @@ ORG &3000
     JSR osnewl
 .dsr_no_chi2
 
+    \ --- Display yaku_flags2 yaku ---
+    LDA yaku_flags2: AND #&01: BEQ dsr_no_ipp
+    LDY #0
+.dsr_ipp
+    LDA yaku_ipp_str, Y: BEQ dsr_ipp_dn
+    JSR oswrch: INY: JMP dsr_ipp
+.dsr_ipp_dn
+    JSR osnewl
+.dsr_no_ipp
+
+    LDA yaku_flags2: AND #&02: BEQ dsr_no_iip
+    LDY #0
+.dsr_iip
+    LDA yaku_iip_str, Y: BEQ dsr_iip_dn
+    JSR oswrch: INY: JMP dsr_iip
+.dsr_iip_dn
+    JSR osnewl
+.dsr_no_iip
+
+    LDA yaku_flags2: AND #&04: BEQ dsr_no_sans
+    LDY #0
+.dsr_sans
+    LDA yaku_sans_str, Y: BEQ dsr_sans_dn
+    JSR oswrch: INY: JMP dsr_sans
+.dsr_sans_dn
+    JSR osnewl
+.dsr_no_sans
+
+    LDA yaku_flags2: AND #&08: BEQ dsr_no_itt
+    LDY #0
+.dsr_itt
+    LDA yaku_itt_str, Y: BEQ dsr_itt_dn
+    JSR oswrch: INY: JMP dsr_itt
+.dsr_itt_dn
+    JSR osnewl
+.dsr_no_itt
+
+    LDA yaku_flags2: AND #&10: BEQ dsr_no_cha
+    LDY #0
+.dsr_cha
+    LDA yaku_cha_str, Y: BEQ dsr_cha_dn
+    JSR oswrch: INY: JMP dsr_cha
+.dsr_cha_dn
+    JSR osnewl
+.dsr_no_cha
+
+    LDA yaku_flags2: AND #&20: BEQ dsr_no_ss
+    LDY #0
+.dsr_ss
+    LDA yaku_ss_str, Y: BEQ dsr_ss_dn
+    JSR oswrch: INY: JMP dsr_ss
+.dsr_ss_dn
+    JSR osnewl
+.dsr_no_ss
+
+    LDA yaku_flags2: AND #&40: BEQ dsr_no_ct
+    LDY #0
+.dsr_ct
+    LDA yaku_ct_str, Y: BEQ dsr_ct_dn
+    JSR oswrch: INY: JMP dsr_ct
+.dsr_ct_dn
+    JSR osnewl
+.dsr_no_ct
+
+
     JSR osnewl
 
     LDY #0
@@ -3074,6 +3407,20 @@ ORG &3000
     EQUS "HONITSU", 0
 .yaku_chi_str
     EQUS "CHINITSU", 0
+.yaku_ipp_str
+    EQUS "IPPATSU", 0
+.yaku_iip_str
+    EQUS "IIPPEIKO", 0
+.yaku_sans_str
+    EQUS "SANSHOKU", 0
+.yaku_itt_str
+    EQUS "ITTSU", 0
+.yaku_cha_str
+    EQUS "CHANTA", 0
+.yaku_ss_str
+    EQUS "SHOU SANGEN", 0
+.yaku_ct_str
+    EQUS "CHII TOITSU", 0
 .han_lbl
     EQUS "Han: ", 0
 .fu_lbl
@@ -3201,6 +3548,7 @@ ORG &3000
 
 \\ Scoring variables
 .yaku_flags EQUB 0
+.yaku_flags2 EQUB 0
 .han_count EQUB 0
 .fu_count EQUB 0
 .hand_closed EQUB 0
