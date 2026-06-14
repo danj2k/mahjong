@@ -1651,9 +1651,8 @@ ORG &3000
     CMP #NUM_PLAYERS-1
     BEQ dpl_honba
     \ Show R marker if player declared riichi
-    STX tmp5
-    LDX tmp5
-    LDA riichi_declared, X
+    LDY tmp5
+    LDA riichi_declared, Y
     BEQ dpl_no_riichi
     LDA #'R': JSR oswrch
     JMP dpl_honba
@@ -1664,64 +1663,30 @@ ORG &3000
     INX
     CPX #NUM_PLAYERS
     BNE dpl_lp
-    \\ Print honba count
+    \\ Print honba and round info on one line
     LDA #' ': JSR oswrch
     LDA #'H': JSR oswrch
     LDA #':': JSR oswrch
     LDA honba
     CLC: ADC #'0'
     JSR oswrch
-    \\ Print round wind and seat winds
-    JSR osnewl
-    LDA #'R': JSR oswrch
-    LDA #':': JSR oswrch
-    \ Print round wind (East/South based on hands_played)
+    \ Print round wind
     LDA hands_played
     CMP #4
     BCC dpl_east
-    LDY #0
-.dpl_s_lp
-    LDA south_str, Y
-    BEQ dpl_s_dn
-    JSR oswrch: INY
-    JMP dpl_s_lp
-.dpl_s_dn
-    JMP dpl_seats
-.dpl_east
-    LDY #0
-.dpl_e_lp
-    LDA east_str, Y
-    BEQ dpl_e_dn
-    JSR oswrch: INY
-    JMP dpl_e_lp
-.dpl_e_dn
-.dpl_seats
-    LDA #' ': JSR oswrch
     LDA #'S': JSR oswrch
-    LDA #':': JSR oswrch
-    \ Print seat winds (E/S/W/N)
-    LDX #0
-.dpl_sw_lp
-    LDA seat_winds, X
-    SEC: SBC #27
-    TAY
-    LDA seat_wind_chrs, Y
-    JSR oswrch
-    INX
-    CPX #NUM_PLAYERS
-    BNE dpl_sw_lp
-    \ Print dealer marker
-    LDA #' ': JSR oswrch
+    JMP dpl_round_dn
+.dpl_east
+    LDA #'E': JSR oswrch
+.dpl_round_dn
+    \ Print dealer number
     LDA #'D': JSR oswrch
-    LDA #':': JSR oswrch
     LDX dealer
     INX
     TXA: CLC: ADC #'0'
     JSR oswrch
-    \\ Print dora indicator
-    LDA #' ': JSR oswrch
+    \ Print dora indicator
     LDA #'O': JSR oswrch
-    LDA #':': JSR oswrch
     LDA dora_indicator
     JSR tile_num_char: JSR oswrch
     LDA dora_indicator
