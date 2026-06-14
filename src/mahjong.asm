@@ -2531,7 +2531,7 @@ ORG &3000
 \ Main scoring entry point
 .calculate_score
     LDA #0
-    STA han_count: STA fu_count: STA yaku_flags: STA yaku_flags2
+    STA han_count: STA fu_count: STA yaku_flags: STA yaku_flags2: STA yaku_flags3
     JSR build_tile_counts
 
     \ Determine if hand is closed
@@ -2641,6 +2641,34 @@ ORG &3000
     LDA han_count: CLC: ADC #2: STA han_count
     LDA yaku_flags2: ORA #&40: STA yaku_flags2
 .cs_no_ct
+
+    \\ --- MENZEN TSUMO (1 han, closed only, self-draw) ---
+    LDA hand_closed: BEQ cs_no_mt
+    LDA tsumo_flag: BEQ cs_no_mt
+    INC han_count
+    LDA yaku_flags3: ORA #&80: STA yaku_flags3
+.cs_no_mt
+
+    \\ --- SANANKOU (2 han) - three concealed triplets ---
+    JSR check_sanankou
+    BCC cs_no_sa
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags3: ORA #&01: STA yaku_flags3
+.cs_no_sa
+
+    \\ --- HONROUTOU (2 han) - all terminals and honors ---
+    JSR check_honroutou
+    BCC cs_no_hr
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags3: ORA #&02: STA yaku_flags3
+.cs_no_hr
+
+    \\ --- SANSHOKU DOUKOU (2 han) - same triplets across 3 suits ---
+    JSR check_sanshoku_doukou
+    BCC cs_no_sd
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags3: ORA #&04: STA yaku_flags3
+.cs_no_sd
 
         JSR calculate_fu
         JSR compute_points
@@ -3051,9 +3079,103 @@ ORG &3000
     CLC: RTS
 
 
-\ =============================================
-\ FU CALCULATION
-\ =============================================
+\\ =============================================
+\\ NEW YAKU DETECTION (4 additional yaku)
+\\ =============================================
+
+\\ SANANKOU: three concealed triplets (2 han)
+\\ A concealed triplet is a triplet of tiles held in hand (not from open melds).
+\\ We check by finding tiles with count >= 3 in tile_counts.
+\\ The pair tile (count 2) must be excluded from the count.
+.check_sanankou
+    JSR build_tile_counts
+    \\ Remove pair from tile_counts
+    LDX #0
+.csa_find_pair
+    LDA tile_counts, X
+    CMP #2: BEQ csa_found_pair
+    INX: CPX #34: BNE csa_find_pair
+    JMP csa_count
+.csa_found_pair
+    LDA #0: STA tile_counts, X
+.csa_count
+    \\ Count triplets (concealed = all 3 in hand)
+    LDX #0: STX tmp
+.csa_loop
+    LDA tile_counts, X
+    CMP #3: BCC csa_next
+    INC tmp
+.csa_next
+    INX: CPX #34: BNE csa_loop
+    \\ Restore the pair to 2 for later use
+    LDX #0
+.csa_restore
+    LDA tile_counts, X: CMP #0: BEQ csa_rnext
+    INX: CPX #34: BNE csa_restore
+.csa_rnext
+    LDA #2: STA tile_counts, X
+    \\ Check if we have 3 or more concealed triplets
+    LDA tmp
+    CMP #3: BCS csa_yes
+    CLC: RTS
+.csa_yes
+    SEC: RTS
+
+\\ HONROUTOU: all terminals and honors (2 han)
+\\ Every tile in the hand must be a terminal (1 or 9 of any suit) or honor tile
+.check_honroutou
+    JSR build_tile_counts
+    LDX #0
+.chr_loop
+    LDA tile_counts, X
+    BEQ chr_next
+    TXA: JSR is_terminal_or_honor_a
+    BCC chr_fail
+.chr_next
+    INX: CPX #34: BNE chr_loop
+    SEC: RTS
+.chr_fail
+    CLC: RTS
+
+\\ Helper: is tile value in A terminal or honor? Returns C set if yes.
+.is_terminal_or_honor_a
+    CMP #0: BEQ ita_yes
+    CMP #8: BEQ ita_yes
+    CMP #9: BEQ ita_yes
+    CMP #17: BEQ ita_yes
+    CMP #18: BEQ ita_yes
+    CMP #26: BEQ ita_yes
+    CMP #27: BCS ita_yes
+    CLC: RTS
+.ita_yes
+    SEC: RTS
+
+\\ SANSHOKU DOUKOU: same triplets across all 3 suits (2 han)
+\\ For each number 1-9, check if there's a triplet in all 3 suits (man, pin, sou)
+.check_sanshoku_doukou
+    JSR build_tile_counts
+    LDY #0
+.csd_outer
+    CPY #9: BCS csd_no
+    \\ Check man (Y), pin (Y+9), sou (Y+18)
+    LDA tile_counts, Y
+    CMP #3: BCC csd_next
+    TYA: CLC: ADC #9: TAX
+    LDA tile_counts, X
+    CMP #3: BCC csd_next
+    TYA: CLC: ADC #18: TAX
+    LDA tile_counts, X
+    CMP #3: BCC csd_next
+    SEC: RTS
+.csd_next
+    INY: JMP csd_outer
+.csd_no
+    CLC: RTS
+
+
+\\ =============================================
+\\ FU CALCULATION
+\\ =============================================
 
 .calculate_fu
     LDA #30: STA fu_count
@@ -3385,6 +3507,44 @@ ORG &3000
 .dsr_ct_dn
     JSR osnewl
 .dsr_no_ct
+
+    \\ --- Display yaku_flags3 yaku ---
+
+    LDA yaku_flags3: AND #&80: BEQ dsr_no_mt
+    LDY #0
+.dsr_mt
+    LDA yaku_mt_str, Y: BEQ dsr_mt_dn
+    JSR oswrch: INY: JMP dsr_mt
+.dsr_mt_dn
+    JSR osnewl
+.dsr_no_mt
+
+    LDA yaku_flags3: AND #&01: BEQ dsr_no_sa
+    LDY #0
+.dsr_sa
+    LDA yaku_sa_str, Y: BEQ dsr_sa_dn
+    JSR oswrch: INY: JMP dsr_sa
+.dsr_sa_dn
+    JSR osnewl
+.dsr_no_sa
+
+    LDA yaku_flags3: AND #&02: BEQ dsr_no_hr
+    LDY #0
+.dsr_hr
+    LDA yaku_hr_str, Y: BEQ dsr_hr_dn
+    JSR oswrch: INY: JMP dsr_hr
+.dsr_hr_dn
+    JSR osnewl
+.dsr_no_hr
+
+    LDA yaku_flags3: AND #&04: BEQ dsr_no_sd
+    LDY #0
+.dsr_sd
+    LDA yaku_sd_str, Y: BEQ dsr_sd_dn
+    JSR oswrch: INY: JMP dsr_sd
+.dsr_sd_dn
+    JSR osnewl
+.dsr_no_sd
 
 
     JSR osnewl
@@ -4138,6 +4298,7 @@ ORG &3000
 \\ Scoring variables
 .yaku_flags EQUB 0
 .yaku_flags2 EQUB 0
+.yaku_flags3 EQUB 0
 .han_count EQUB 0
 .fu_count EQUB 0
 .hand_closed EQUB 0
@@ -4195,5 +4356,16 @@ ORG &3000
     EQUS " pays ", 0
 .pts_str
     EQUS " pts", 0
+
+\\ Yaku display strings (new yaku)
+.yaku_mt_str
+    EQUS "MENZEN TSUMO 1 han", 0
+.yaku_sa_str
+    EQUS "SANANKOU 2 han", 0
+.yaku_hr_str
+    EQUS "HONROUTOU 2 han", 0
+.yaku_sd_str
+    EQUS "SANSHOKU DOUKOU 2 han", 0
+
 .end
 SAVE "MAHJONG", start, end, start
