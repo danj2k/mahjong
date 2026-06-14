@@ -55,6 +55,7 @@ tile_counts = &7C
 \ Meld decomposition result storage
 \\ Temp variable for open call routines
 tmp9 = &9E
+no_seq_flag = &9F
 
 \ =============================================
 ORG &3000
@@ -68,11 +69,18 @@ ORG &3000
 
 \ --- Main loop ---
 .mainloop
+    LDA #0: STA tsumo_flag: STA ron_flag
     LDA skip_draw
     BNE ml_skip_draw
 
     JSR player_draw
-    BCS game_over
+    BCC ml_draw_ok
+    JMP game_over
+.ml_draw_ok
+    JSR check_tsumo
+    BCC ml_not_tsumo
+    JMP ml_tsumo
+.ml_not_tsumo
     JMP ml_got_tile
 
 .ml_skip_draw
@@ -87,6 +95,10 @@ ORG &3000
     JSR sort_hand
     JSR ai_choose_discard
     JSR player_discard
+    JSR check_ron
+    BCC ml_not_ron
+    JMP ml_ron
+.ml_not_ron
     JSR check_open_calls
     BCS ml_call_made
     JSR ai_delay
@@ -104,6 +116,10 @@ ORG &3000
     JSR game_display
     JSR human_input
     JSR player_discard
+    JSR check_ron
+    BCC ml_not_ron_h
+    JMP ml_ron
+.ml_not_ron_h
     JSR check_open_calls
     BCS ml_call_made_h
     JSR advance_player
@@ -111,6 +127,25 @@ ORG &3000
 
 .ml_call_made_h
     JSR game_display
+    JMP mainloop
+
+.ml_tsumo
+    JSR sort_hand
+    JSR game_display
+    JSR calculate_score
+    JSR display_score_result
+    JSR award_tsumo
+    JSR new_round
+    JMP mainloop
+
+.ml_ron
+    LDX ron_player: STX current_player
+    JSR sort_hand
+    JSR game_display
+    JSR calculate_score
+    JSR display_score_result
+    JSR award_ron
+    JSR new_round
     JMP mainloop
 
 .game_over
@@ -1123,6 +1158,9 @@ ORG &3000
     STA tile_counts, X
 
 .dm_try_seq
+    \ Skip sequences if no_seq_flag is set (for toitoi check)
+    LDA no_seq_flag: BNE dm_fail
+
     \ Try sequence (only suited tiles 0-26)
     PLA: TAX            \ restore tile index
     PHA                 \ save again for potential backtrack
@@ -1293,6 +1331,682 @@ ORG &3000
     CLC
     RTS
 
+
+\ =============================================
+\ SCORING SYSTEM
+\ =============================================
+
+\ Main scoring entry point
+.calculate_score
+    LDA #0
+    STA han_count: STA fu_count: STA yaku_flags
+    JSR build_tile_counts
+
+    \ Determine if hand is closed
+    LDX current_player
+    LDA opn_count, X
+    CMP #1
+    LDA #0
+    BCS cs_set_open
+    LDA #1
+.cs_set_open
+    STA hand_closed
+
+    \ --- TANYAO (1 han) ---
+    JSR check_tanyao
+    BCC cs_no_tanyao
+    INC han_count
+    LDA yaku_flags: ORA #&01: STA yaku_flags
+.cs_no_tanyao
+
+    \ --- YAKUHAI ---
+    JSR check_yakuhai
+
+    \ --- TOITOI (2 han) ---
+    JSR check_toitoi
+    BCC cs_no_toitoi
+    LDA han_count: CLC: ADC #2: STA han_count
+    LDA yaku_flags: ORA #&80: STA yaku_flags
+.cs_no_toitoi
+
+    \ --- CHINITSU (6 han) ---
+    JSR check_chinitsu
+    BCC cs_no_chi
+    LDA han_count: CLC: ADC #6: STA han_count
+    LDA yaku_flags: ORA #&40: STA yaku_flags
+    JMP cs_fu
+.cs_no_chi
+
+    \ --- HONITSU (3 han) ---
+    JSR check_honitsu
+    BCC cs_no_hon
+    LDA han_count: CLC: ADC #3: STA han_count
+    LDA yaku_flags: ORA #&20: STA yaku_flags
+.cs_no_hon
+
+    \ --- PINFU (1 han, closed only) ---
+.cs_fu
+    LDA hand_closed: BEQ cs_no_pin
+    JSR check_pinfu
+    BCC cs_no_pin
+    INC han_count
+    LDA yaku_flags: ORA #&02: STA yaku_flags
+.cs_no_pin
+
+    JSR calculate_fu
+    JSR compute_points
+    RTS
+
+\ =============================================
+\ YAKU DETECTION
+\ =============================================
+
+\ TANYAO: all simples (no terminals/honors)
+.check_tanyao
+    LDX #0
+.ct_loop
+    LDA tile_counts, X
+    BEQ ct_next
+    CPX #0: BEQ ct_fail
+    CPX #8: BEQ ct_fail
+    CPX #9: BEQ ct_fail
+    CPX #17: BEQ ct_fail
+    CPX #18: BEQ ct_fail
+    CPX #26: BEQ ct_fail
+    CPX #27: BCS ct_fail
+.ct_next
+    INX: CPX #34: BNE ct_loop
+    SEC: RTS
+.ct_fail
+    CLC: RTS
+
+\ YAKUHAI: check pair and open melds for value tiles
+.check_yakuhai
+    LDX #0
+.cy_pair
+    LDA tile_counts, X
+    CMP #2: BNE cy_pnext
+    JSR is_yakuhai_tile
+    BCC cy_pnext
+    INC han_count
+.cy_pnext
+    INX: CPX #34: BNE cy_pair
+
+    \ Check open melds
+    LDX current_player
+    LDA opn_count, X
+    BEQ cy_done
+    STA tmp8
+    TXA: ASL A: ASL A: STA tmp9
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp9: STA tmp9
+    LDY #0
+.cy_omlp
+    CPY tmp8: BCS cy_done
+    STY tmp
+    TYA: ASL A: ASL A: CLC: ADC tmp
+    CLC: ADC tmp9: TAX
+    INX
+    LDA opn_melds, X
+    TAX
+    JSR is_yakuhai_tile
+    BCC cy_onext
+    INC han_count
+.cy_onext
+    LDY tmp: INY
+    JMP cy_omlp
+.cy_done
+    RTS
+
+\ Check if tile X is yakuhai
+.is_yakuhai_tile
+    TXA: PHA
+    CPX #31: BCS iy_yes
+    CPX #27: BCC iy_not
+    \ Wind tiles 27-30: check seat and round wind
+    TXA: SEC: SBC #27
+    CMP current_player: BEQ iy_yes
+    TXA: CMP round_wind: BEQ iy_yes
+.iy_not
+    PLA: TAX
+    CLC: RTS
+.iy_yes
+    PLA: TAX
+    SEC: RTS
+
+\ TOITOI: all melds are triplets (no sequences)
+.check_toitoi
+    LDX current_player
+    LDA opn_count, X
+    BEQ ctt_check
+
+    TXA: ASL A: ASL A: STA tmp
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp: STA tmp
+    LDY opn_count, X: DEY
+.ctt_omlp
+    STY tmp2
+    TYA: ASL A: ASL A: CLC: ADC tmp2
+    CLC: ADC tmp: TAX
+    INX
+    LDA opn_melds, X: STA tmp3
+    INX: LDA opn_melds, X
+    CMP tmp3: BNE ctt_no
+    INX: LDA opn_melds, X
+    CMP tmp3: BNE ctt_no
+    LDY tmp2: DEY: BPL ctt_omlp
+
+.ctt_check
+    JSR build_tile_counts
+    LDX #0
+.ctt_try
+    LDA tile_counts, X
+    CMP #2: BCC ctt_next
+    SEC: SBC #2: STA tile_counts, X
+    TXA: PHA
+    LDA #1: STA no_seq_flag
+    JSR decompose_melds
+    LDA #0: STA no_seq_flag
+    BCS ctt_found
+    PLA: TAX: PHA
+    LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
+    PLA: TAX
+.ctt_next
+    INX: CPX #34: BNE ctt_try
+    CLC: RTS
+.ctt_found
+    PLA
+    SEC: RTS
+.ctt_no
+    CLC: RTS
+
+\ COUNT SUITS
+.count_suits
+    LDA #0: STA tmp
+    LDX #0: JSR cs_has: BCC cs_mn
+    INC tmp
+.cs_mn
+    LDX #9: JSR cs_has: BCC cs_pn
+    INC tmp
+.cs_pn
+    LDX #18: JSR cs_has: BCC cs_dn
+    INC tmp
+.cs_dn
+    LDA tmp
+    RTS
+
+.cs_has
+    LDY #0
+.csh_lp
+    LDA tile_counts, X
+    BNE csh_yes
+    INX: INY: CPY #9: BNE csh_lp
+    CLC: RTS
+.csh_yes
+    SEC: RTS
+
+\ HONITSU: one suit + honors
+.check_honitsu
+    JSR count_suits
+    CMP #1: BNE ch_no
+    LDX #27: LDA #0
+.ch_hon
+    ORA tile_counts, X: INX: CPX #34: BNE ch_hon
+    BEQ ch_no
+    SEC: RTS
+.ch_no
+    CLC: RTS
+
+\ CHINITSU: one suit, no honors
+.check_chinitsu
+    JSR count_suits
+    CMP #1: BNE cc_no
+    LDX #27: LDA #0
+.cc_hon
+    ORA tile_counts, X: INX: CPX #34: BNE cc_hon
+    BNE cc_no
+    SEC: RTS
+.cc_no
+    CLC: RTS
+
+\ PINFU: closed hand, all sequences, pair not yakuhai
+.check_pinfu
+    LDA hand_closed: BEQ cp_no
+    JSR build_tile_counts
+    LDX #0
+.cp_pair
+    LDA tile_counts, X
+    CMP #2: BNE cp_pnext
+    JSR is_yakuhai_tile
+    BCS cp_no
+    LDA #0: STA tile_counts, X
+    LDY #0
+.cp_trip
+    LDA tile_counts, Y
+    CMP #3: BCS cp_no
+    INY: CPY #34: BNE cp_trip
+    SEC: RTS
+.cp_pnext
+    INX: CPX #34: BNE cp_pair
+.cp_no
+    CLC: RTS
+
+\ =============================================
+\ FU CALCULATION
+\ =============================================
+
+.calculate_fu
+    LDA #30: STA fu_count
+
+    LDX #0
+.cf_pair
+    LDA tile_counts, X
+    CMP #2: BNE cf_pnext
+    JSR is_yakuhai_tile
+    BCC cf_pnext
+    LDA fu_count: CLC: ADC #2: STA fu_count
+    JMP cf_melds
+.cf_pnext
+    INX: CPX #34: BNE cf_pair
+
+.cf_melds
+    LDX current_player
+    LDA opn_count, X
+    BEQ cf_closed
+
+    TXA: ASL A: ASL A: STA tmp
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp: STA tmp
+    LDY opn_count, X: DEY
+.cf_open_lp
+    STY tmp2
+    TYA: ASL A: ASL A: CLC: ADC tmp2
+    CLC: ADC tmp: TAX
+    INX
+    LDA opn_melds, X
+    JSR is_terminal_or_honor
+    BCC cf_open_s
+    LDA fu_count: CLC: ADC #4: STA fu_count
+    JMP cf_open_next
+.cf_open_s
+    LDA fu_count: CLC: ADC #2: STA fu_count
+.cf_open_next
+    LDY tmp2: DEY: BPL cf_open_lp
+    JMP cf_win_bonus
+
+.cf_closed
+    LDX #0
+.cf_clp
+    LDA tile_counts, X
+    CMP #3: BNE cf_cnext
+    JSR is_terminal_or_honor
+    BCC cf_csimp
+    LDA fu_count: CLC: ADC #8: STA fu_count
+    JMP cf_cnext
+.cf_csimp
+    LDA fu_count: CLC: ADC #4: STA fu_count
+.cf_cnext
+    INX: CPX #34: BNE cf_clp
+
+.cf_win_bonus
+    LDA ron_flag: BEQ cf_no_ron
+    LDA fu_count: CLC: ADC #2: STA fu_count
+.cf_no_ron
+
+    LDA yaku_flags: AND #&02: BEQ cf_not_pin
+    LDA tsumo_flag: BEQ cf_not_pin
+    LDA #20: STA fu_count
+    JMP cf_round
+.cf_not_pin
+
+.cf_round
+    LDA fu_count: CLC: ADC #9
+    LDY #0
+.cf_div
+    CMP #10: BCC cf_divdn
+    SEC: SBC #10: INY: JMP cf_div
+.cf_divdn
+    TYA: STA tmp
+    LDA #0
+.cf_mul
+    CLC: ADC #10: DEC tmp: BNE cf_mul
+    STA fu_count
+    CMP #30: BCS cf_done
+    LDA #30: STA fu_count
+.cf_done
+    RTS
+
+\ Check if tile A is terminal or honor
+.is_terminal_or_honor
+    CMP #0: BEQ itoh_y
+    CMP #8: BEQ itoh_y
+    CMP #9: BEQ itoh_y
+    CMP #17: BEQ itoh_y
+    CMP #18: BEQ itoh_y
+    CMP #26: BEQ itoh_y
+    CMP #27: BCS itoh_y
+    CLC: RTS
+.itoh_y
+    SEC: RTS
+
+\ =============================================
+\ SCORE FORMULA
+\ =============================================
+
+.compute_points
+    LDA fu_count: ASL A: ASL A
+    STA score_lo
+    LDA #0: STA score_hi
+
+    LDX han_count: BEQ cp_lim
+.cp_mul
+    ASL score_lo: ROL score_hi
+    DEX: BNE cp_mul
+
+.cp_lim
+    LDA score_hi
+    CMP #>(2000): BCC cp_chk_han
+    BNE cp_limit_chk
+    LDA score_lo: CMP #<(2000): BCC cp_chk_han
+
+.cp_limit_chk
+    LDA han_count
+    CMP #6: BCC cp_set_mangan
+    CMP #8: BCS cp_baiman
+    LDA #<(3000): STA score_lo
+    LDA #>(3000): STA score_hi
+    JMP cp_done
+.cp_baiman
+    CMP #11: BCS cp_sanbaiman
+    LDA #<(4000): STA score_lo
+    LDA #>(4000): STA score_hi
+    JMP cp_done
+.cp_sanbaiman
+    CMP #13: BCS cp_yakuman
+    LDA #<(6000): STA score_lo
+    LDA #>(6000): STA score_hi
+    JMP cp_done
+.cp_yakuman
+    LDA #<(8000): STA score_lo
+    LDA #>(8000): STA score_hi
+    JMP cp_done
+
+.cp_chk_han
+    LDA han_count: CMP #5: BCC cp_done
+
+.cp_set_mangan
+    LDA #<(2000): STA score_lo
+    LDA #>(2000): STA score_hi
+.cp_done
+    RTS
+
+\ =============================================
+\ WIN DETECTION (Tsumo/Ron)
+\ =============================================
+
+.check_tsumo
+    JSR check_win
+    BCS cts_win
+    CLC: RTS
+.cts_win
+    LDA #1: STA tsumo_flag
+    LDA #0: STA ron_flag
+    SEC: RTS
+
+.check_ron
+    LDX #0
+.cr_loop
+    CPX disc_tile_player: BEQ cr_next
+    STX tmp5
+    JSR count_tiles_for_player
+    LDY disc_tile_val
+    LDA tile_counts, Y: CLC: ADC #1: STA tile_counts, Y
+    JSR check_win_no_rebuild
+    BCS cr_found
+    LDY disc_tile_val
+    LDA tile_counts, Y: SEC: SBC #1: STA tile_counts, Y
+.cr_next
+    LDX tmp5: INX
+    CPX #NUM_PLAYERS: BNE cr_loop
+    CLC: RTS
+.cr_found
+    LDA tmp5: STA ron_player
+    LDA #0: STA tsumo_flag
+    LDA #1: STA ron_flag
+    SEC: RTS
+
+.check_win_no_rebuild
+    LDX #0
+.cwnr_try
+    LDA tile_counts, X
+    CMP #2: BCC cwnr_next
+    SEC: SBC #2: STA tile_counts, X
+    TXA: PHA
+    JSR decompose_melds
+    BCS cwnr_win
+    PLA: TAX: PHA
+    LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
+    PLA: TAX
+.cwnr_next
+    INX: CPX #34: BNE cwnr_try
+    CLC: RTS
+.cwnr_win
+    PLA
+    SEC: RTS
+
+\ =============================================
+\ SCORE DISPLAY
+\ =============================================
+
+.display_score_result
+    LDA #12: JSR oswrch
+
+    LDA tsumo_flag: BEQ dsr_ron
+    LDY #0
+.dsr_tmsg
+    LDA tsumo_msg, Y: BEQ dsr_tmsg_dn
+    JSR oswrch: INY: JMP dsr_tmsg
+.dsr_tmsg_dn
+    JMP dsr_yaku
+.dsr_ron
+    LDY #0
+.dsr_rmsg
+    LDA ron_msg, Y: BEQ dsr_rmsg_dn
+    JSR oswrch: INY: JMP dsr_rmsg
+.dsr_rmsg_dn
+
+.dsr_yaku
+    JSR osnewl
+    LDA yaku_flags: AND #&01: BEQ dsr_no_tan
+    LDY #0
+.dsr_tan
+    LDA yaku_tan_str, Y: BEQ dsr_tan_dn
+    JSR oswrch: INY: JMP dsr_tan
+.dsr_tan_dn
+    JSR osnewl
+.dsr_no_tan
+
+    LDA yaku_flags: AND #&02: BEQ dsr_no_pin
+    LDY #0
+.dsr_pin
+    LDA yaku_pin_str, Y: BEQ dsr_pin_dn
+    JSR oswrch: INY: JMP dsr_pin
+.dsr_pin_dn
+    JSR osnewl
+.dsr_no_pin
+
+    LDA yaku_flags: AND #&80: BEQ dsr_no_toi
+    LDY #0
+.dsr_toi
+    LDA yaku_toi_str, Y: BEQ dsr_toi_dn
+    JSR oswrch: INY: JMP dsr_toi
+.dsr_toi_dn
+    JSR osnewl
+.dsr_no_toi
+
+    LDA yaku_flags: AND #&20: BEQ dsr_no_hon
+    LDY #0
+.dsr_hon
+    LDA yaku_hon_str, Y: BEQ dsr_hon_dn
+    JSR oswrch: INY: JMP dsr_hon
+.dsr_hon_dn
+    JSR osnewl
+.dsr_no_hon
+
+    LDA yaku_flags: AND #&40: BEQ dsr_no_chi2
+    LDY #0
+.dsr_chi2
+    LDA yaku_chi_str, Y: BEQ dsr_chi2_dn
+    JSR oswrch: INY: JMP dsr_chi2
+.dsr_chi2_dn
+    JSR osnewl
+.dsr_no_chi2
+
+    JSR osnewl
+
+    LDY #0
+.dsr_han
+    LDA han_lbl, Y: BEQ dsr_han_dn
+    JSR oswrch: INY: JMP dsr_han
+.dsr_han_dn
+    LDA han_count: CLC: ADC #'0': JSR oswrch
+    LDA #' ': JSR oswrch
+
+    LDY #0
+.dsr_fu
+    LDA fu_lbl, Y: BEQ dsr_fu_dn
+    JSR oswrch: INY: JMP dsr_fu
+.dsr_fu_dn
+    LDA fu_count
+    LDX #0
+.dsr_fu10
+    CMP #10: BCC dsr_fu10dn
+    SEC: SBC #10: INX: JMP dsr_fu10
+.dsr_fu10dn
+    PHA
+    TXA: CLC: ADC #'0': JSR oswrch
+    PLA: CLC: ADC #'0': JSR oswrch
+    JSR osnewl: JSR osnewl
+
+    LDY #0
+.dsr_sc
+    LDA score_lbl, Y: BEQ dsr_sc_dn
+    JSR oswrch: INY: JMP dsr_sc
+.dsr_sc_dn
+    LDA score_hi: LDX score_lo
+    JSR print_num16
+    JSR osnewl: JSR osnewl
+
+    LDY #0
+.dsr_pk
+    LDA press_key_str, Y: BEQ dsr_pk_dn
+    JSR oswrch: INY: JMP dsr_pk
+.dsr_pk_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    RTS
+
+\ =============================================
+\ POINT AWARDING
+\ =============================================
+
+.award_tsumo
+    LDX #0
+.at_lp
+    CPX current_player: BEQ at_skip
+    STX tmp5
+    LDA score_hi: STA tmp2
+    LDA score_lo: STA tmp3
+    LDA #0
+    LDY #16
+.at_d3
+    ASL tmp3: ROL tmp2: ROL A
+    CMP #3: BCC at_d3s
+    SBC #3: INC tmp3
+.at_d3s
+    DEY: BNE at_d3
+    CMP #0: BEQ at_nornd
+    LDA tmp3: CLC: ADC #100: STA tmp3
+    BCC at_nornd
+    INC tmp2
+.at_nornd
+    LDA honba: BEQ at_hb_done
+    STA tmp4
+    LDA #0
+.at_hb
+    CLC: ADC #100: DEC tmp4: BNE at_hb
+    CLC: ADC tmp3: STA tmp3
+    BCC at_hb_done
+    INC tmp2
+.at_hb_done
+    LDX tmp5
+    TXA: ASL A: TAX
+    LDA player_points, X
+    SEC: SBC tmp3: STA player_points, X
+    LDA player_points+1, X
+    SBC tmp2: STA player_points+1, X
+.at_skip
+    LDX tmp5: INX
+    CPX #NUM_PLAYERS: BNE at_lp
+
+    LDX current_player
+    TXA: ASL A: TAX
+    LDA player_points, X
+    CLC: ADC score_lo: STA player_points, X
+    LDA player_points+1, X
+    ADC score_hi: STA player_points+1, X
+
+    LDA #0: STA honba
+    RTS
+
+.award_ron
+    LDA score_lo: ASL A: STA tmp3
+    LDA score_hi: ROL A: STA tmp2
+    LDA tmp3: ASL A: STA tmp3
+    LDA tmp2: ROL A: STA tmp2
+
+    LDA honba: BEQ ar_hb_done
+    STA tmp4
+    LDA #0
+.ar_hb
+    CLC: ADC #100: DEC tmp4: BNE ar_hb
+    ASL A: ASL A  \ *4 = *300 approx (close enough for now)
+    CLC: ADC tmp3: STA tmp3
+    BCC ar_hb_done
+    INC tmp2
+.ar_hb_done
+
+    LDX disc_tile_player
+    TXA: ASL A: TAX
+    LDA player_points, X
+    SEC: SBC tmp3: STA player_points, X
+    LDA player_points+1, X
+    SBC tmp2: STA player_points+1, X
+
+    LDX ron_player
+    TXA: ASL A: TAX
+    LDA player_points, X
+    CLC: ADC tmp3: STA player_points, X
+    LDA player_points+1, X
+    ADC tmp2: STA player_points+1, X
+
+    LDA #0: STA honba
+    RTS
+
+\ =============================================
+\ NEW ROUND
+\ =============================================
+
+.new_round
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    JSR wall_build
+    JSR wall_shuffle
+    JSR deal_all
+    LDA #0: STA current_player: STA skip_draw
+    LDA #0: STA tsumo_flag: STA ron_flag
+    RTS
+
 \ =============================================
 \ DATA
 \ =============================================
@@ -1311,6 +2025,29 @@ ORG &3000
 
 .game_over_str
     EQUS "GAME OVER", 0
+
+.tsumo_msg
+    EQUS "TSUMO!", 0
+.ron_msg
+    EQUS "RON!", 0
+.yaku_tan_str
+    EQUS "TANYAO", 0
+.yaku_pin_str
+    EQUS "PINFU", 0
+.yaku_toi_str
+    EQUS "TOITOI", 0
+.yaku_hon_str
+    EQUS "HONITSU", 0
+.yaku_chi_str
+    EQUS "CHINITSU", 0
+.han_lbl
+    EQUS "Han: ", 0
+.fu_lbl
+    EQUS "Fu: ", 0
+.score_lbl
+    EQUS "Score: ", 0
+.press_key_str
+    EQUS "Press any key...", 0
 
 .honor_nums
     EQUS "ESWNHTC"
@@ -1390,6 +2127,18 @@ ORG &3000
     FOR I, 0, NUM_PLAYERS-1
     EQUB 0
     NEXT
+
+\\ Scoring variables
+.yaku_flags EQUB 0
+.han_count EQUB 0
+.fu_count EQUB 0
+.hand_closed EQUB 0
+.score_lo EQUB 0
+.score_hi EQUB 0
+.round_wind EQUB 27
+.tsumo_flag EQUB 0
+.ron_flag EQUB 0
+.ron_player EQUB 0
 
 .end
 
