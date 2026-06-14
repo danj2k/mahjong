@@ -2981,18 +2981,28 @@ ORG &3000
 \ RYANPEIKOU: two pairs of identical sequences (closed only)
 \ Check: find two pairs of identical sequences, remaining must be exactly one pair
 .check_ryanpeikou
-    LDA hand_closed: BEQ crp_no
+    LDA hand_closed: BNE crp_have_closed
+    JMP crp_no
+.crp_have_closed
     JSR build_tile_counts
     \ Find first pair of identical sequences
     LDX #0
 .crp_outer1
-    CPX #27: BCS crp_no
+    CPX #27: BCC crp_try1
+    JMP crp_no
+.crp_try1
     LDA tile_counts, X
-    CMP #2: BCC crp_next1
+    CMP #2: BCS crp_have_a1
+    JMP crp_next1
+.crp_have_a1
     INX: LDA tile_counts, X
-    CMP #2: BCC crp_next1b
+    CMP #2: BCS crp_have_b1
+    JMP crp_next1b
+.crp_have_b1
     INX: LDA tile_counts, X
-    CMP #2: BCC crp_next1c
+    CMP #2: BCS crp_have_c1
+    JMP crp_next1c
+.crp_have_c1
     \ Found first pair at X-2, X-1, X - save X and remove pair
     STX tmp5
     TXA: SEC: SBC #2: TAY
@@ -3002,13 +3012,21 @@ ORG &3000
     \ Find second pair of identical sequences
     LDX #0
 .crp_outer2
-    CPX #27: BCS crp_restore1
+    CPX #27: BCC crp_try2
+    JMP crp_restore1
+.crp_try2
     LDA tile_counts, X
-    CMP #2: BCC crp_next2
+    CMP #2: BCS crp_have_a2
+    JMP crp_next2
+.crp_have_a2
     INX: LDA tile_counts, X
-    CMP #2: BCC crp_next2b
+    CMP #2: BCS crp_have_b2
+    JMP crp_next2b
+.crp_have_b2
     INX: LDA tile_counts, X
-    CMP #2: BCC crp_next2c
+    CMP #2: BCS crp_have_c2
+    JMP crp_next2c
+.crp_have_c2
     \ Found second pair at X-2, X-1, X - remove pair
     TXA: SEC: SBC #2: TAY
     LDA tile_counts, Y: SEC: SBC #2: STA tile_counts, Y
@@ -3046,24 +3064,25 @@ ORG &3000
 .crp_no
     CLC: RTS
 
+
 \ Check if tile_counts has exactly one tile with count 2, rest zero
 .check_single_pair
     LDX #0
     LDY #0
-.csp_loop
-    CPX #34: BCS csp_done
+.crsp_loop
+    CPX #34: BCS crsp_done
     LDA tile_counts, X
-    BEQ csp_next
-    CMP #2: BNE csp_fail
+    BEQ crsp_next
+    CMP #2: BNE crsp_fail
     INY
-.csp_next
-    INX: JMP csp_loop
-.csp_done
-    CPY #1: BEQ csp_yes
+.crsp_next
+    INX: JMP crsp_loop
+.crsp_done
+    CPY #1: BEQ crsp_yes
     CLC: RTS
-.csp_yes
+.crsp_yes
     SEC: RTS
-.csp_fail
+.crsp_fail
     CLC: RTS
 
 \ SANSHOKU: three identical sequences in different suits
