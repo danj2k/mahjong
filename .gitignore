@@ -1,0 +1,14 @@
+# Build outputs (binaries live outside the repo)
+*.ssd
+*.dsd
+*.exe
+*.o
+
+# Editor/IDE files
+*~
+*.swp
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
