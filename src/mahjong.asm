@@ -2726,6 +2726,7 @@ ORG &3000
 
     \\ --- YAKUMAN CHECKS ---
     LDA #0: STA yakuman_flags
+    STA yakuman_flags2
 
     \\ Check Suukantsu (Four Kans)
     JSR check_suukantsu
@@ -2775,6 +2776,15 @@ ORG &3000
     LDA yakuman_flags: ORA #&80: STA yakuman_flags
 .cs_no_chi_h
 
+    \\ Check Suuankou (Four Concealed Triplets)
+    JSR check_suuankou
+    BCC cs_no_suuank
+    LDA yakuman_flags2
+    ORA #&01
+    STA yakuman_flags2
+.cs_no_suuank
+
+
     \\ TENHOU: dealer wins with initial 14 tiles (13 han yakuman)
 .check_tenhou
     \ Only check if dealer's first turn
@@ -2801,9 +2811,66 @@ ORG &3000
 .cchi_yes
     SEC: RTS
 
+\\ SUUANKOU: four concealed triplets (13 han yakuman)
+\\ Requires: no open melds, hand decomposes into 4 concealed triplets + 1 pair
+.check_suuankou
+    \\ Must have no open melds
+    LDX current_player
+    LDA opn_count, X
+    BNE suuank_no
+    \\ Build tile counts from hand
+    JSR build_tile_counts
+    \\ Try to decompose into all triplets
+    JSR decompose_melds_all_triples
+    BCC suuank_no
+    \\ Verify exactly 2 tiles remain (a pair)
+    LDX current_player
+    JSR check_win
+    BCC suuank_no
+    SEC: RTS
+.suuank_no
+    CLC: RTS
+
+\\ Helper: Check if hand decomposes into only triplets
+\\ Uses tile_counts, modifies temp storage
+.decompose_melds_all_triples
+    LDX #0
+    STX tmp9
+.suank_dm_scan
+    CPX #34
+    BEQ suank_dm_check
+    LDA tile_counts, X
+    CMP #3
+    BCC suank_dm_next
+    \\ Found a triplet - remove it
+    SEC: SBC #3
+    STA tile_counts, X
+    INC tmp9
+    LDA tmp9
+    CMP #4
+    BEQ suank_dm_check
+    JMP suank_dm_scan
+.suank_dm_next
+    INX
+    JMP suank_dm_scan
+.suank_dm_check
+    LDX #0
+    LDA #0
+.suank_dm_sum
+    CLC: ADC tile_counts, X
+    INX: CPX #34: BNE suank_dm_sum
+    CMP #2
+    BEQ suank_dm_yes
+    CLC: RTS
+.suank_dm_yes
+    SEC: RTS
+
     \\ If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
+    BNE cs_is_yakuman
+    LDA yakuman_flags2
     BEQ cs_no_yakuman
+.cs_is_yakuman
     LDA #13: STA han_count
     JMP compute_points
 .cs_no_yakuman
@@ -4040,7 +4107,10 @@ ORG &3000
 
     \\ Check if this is a yakuman hand
     LDA yakuman_flags
+    BNE dsr_is_yakuman
+    LDA yakuman_flags2
     BEQ dsr_norm
+.dsr_is_yakuman
     JMP dsr_normal_han
 .dsr_norm
 
@@ -4116,6 +4186,16 @@ ORG &3000
 .dsr_chi_h_dn
     JSR osnewl
 .dsr_no_chi_h
+
+    LDA yakuman_flags2: AND #&01: BEQ dsr_no_suuank
+    LDY #0
+.dsr_suuank
+    LDA yaku_suuank_str, Y: BEQ dsr_suuank_dn
+    JSR oswrch: INY: JMP dsr_suuank
+.dsr_suuank_dn
+    JSR osnewl
+.dsr_no_suuank
+
 
     \\ Display YAKUMAN label
     LDY #0
@@ -4907,6 +4987,7 @@ ORG &3000
 .yaku_flags2 EQUB 0
 .yaku_flags3 EQUB 0
 .yakuman_flags EQUB 0
+.yakuman_flags2 EQUB 0
 \\ First turn flag for Tenhou/Chiihou detection
 .first_turn
     EQUB 0
@@ -5004,6 +5085,8 @@ ORG &3000
     EQUS "TENHOU", 0
 .yaku_chi_h_str
     EQUS "CHIIHOU", 0
+.yaku_suuank_str
+    EQUS "SUUANKOU", 0
 
 .tile_counts
     FOR I, 0, 33
