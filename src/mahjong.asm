@@ -2701,6 +2701,24 @@ ORG &3000
     LDA yakuman_flags: ORA #&04: STA yakuman_flags
 .cs_no_chi_rt
 
+    \\ Check Tsuuiisou (All Honors)
+    JSR check_tsuuiisou
+    BCC cs_no_tsui
+    LDA yakuman_flags: ORA #&08: STA yakuman_flags
+.cs_no_tsui
+
+    \\ Check Daisuushii (Big Four Winds)
+    JSR check_daisuushii
+    BCC cs_no_daiw
+    LDA yakuman_flags: ORA #&20: STA yakuman_flags
+.cs_no_daiw
+
+    \\ Check Shousuushii (Little Four Winds)
+    JSR check_shousuushii
+    BCC cs_no_shouw
+    LDA yakuman_flags: ORA #&10: STA yakuman_flags
+.cs_no_shouw
+
     \\ If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
     BEQ cs_no_yakuman
@@ -3287,14 +3305,14 @@ ORG &3000
 .ccr_loop
     LDA tile_counts, X
     BEQ ccr_next
-    \ Check if tile is a terminal (0, 8, 9, 17, 18, 26)
+    \\ Check if tile is a terminal (0, 8, 9, 17, 18, 26)
     CPX #0: BEQ ccr_next
     CPX #8: BEQ ccr_next
     CPX #9: BEQ ccr_next
     CPX #17: BEQ ccr_next
     CPX #18: BEQ ccr_next
     CPX #26: BEQ ccr_next
-    \ Not a terminal - fail
+    \\ Not a terminal - fail
     CLC
     RTS
 .ccr_next
@@ -3302,6 +3320,147 @@ ORG &3000
     CPX #34
     BNE ccr_loop
     SEC
+    RTS
+
+\\ Tsuuiisou: all honors (13 han yakuman)
+\\ Every tile must be an honor tile (values 27-33)
+\\ No suit tiles allowed
+.check_tsuuiisou
+    JSR build_tile_counts
+    LDX #0
+.ctu_loop
+    LDA tile_counts, X
+    BEQ ctu_next
+    \\ Check if tile is an honor (27-33)
+    CPX #27
+    BCS ctu_next
+    \\ Not an honor - fail
+    CLC
+    RTS
+.ctu_next
+    INX
+    CPX #34
+    BNE ctu_loop
+    SEC
+    RTS
+
+\\ Daisuushii: big four winds (13 han yakuman)
+\\ All four wind triplets (East=27, South=28, West=29, North=30)
+\\ Checks both hand tiles and open melds
+.check_daisuushii
+    JSR build_tile_counts
+    \\ Add open meld wind tiles to counts
+    LDX current_player
+    LDA opn_count, X
+    BEQ cds_check_hand
+    STA tmp8
+    TXA: ASL A: ASL A: STA tmp9
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp9: STA tmp9
+    LDY #0
+.cds_open_lp
+    CPY tmp8: BCS cds_check_hand
+    STY tmp
+    TYA: ASL A: ASL A: CLC: ADC tmp
+    CLC: ADC tmp9: TAX
+    INX
+    LDA opn_melds, X
+    \\ Check if it's a wind tile (27-30)
+    CMP #27: BCC cds_open_next
+    CMP #31: BCS cds_open_next
+    \\ It's a wind - add 3 to count (triplet in open meld)
+    TAX
+    LDA tile_counts, X: CLC: ADC #3: STA tile_counts, X
+.cds_open_next
+    LDY tmp: INY
+    JMP cds_open_lp
+.cds_check_hand
+    \\ Check all four winds have count >= 3
+    LDX #27
+    LDA tile_counts, X
+    CMP #3
+    BCC cds_no
+    LDX #28
+    LDA tile_counts, X
+    CMP #3
+    BCC cds_no
+    LDX #29
+    LDA tile_counts, X
+    CMP #3
+    BCC cds_no
+    LDX #30
+    LDA tile_counts, X
+    CMP #3
+    BCC cds_no
+    SEC
+    RTS
+.cds_no
+    CLC
+    RTS
+
+\\ Shousuushii: little four winds (13 han yakuman)
+\\ Three wind triplets + one wind pair
+\\ Checks both hand tiles and open melds
+.check_shousuushii
+    JSR build_tile_counts
+    \\ Add open meld wind tiles to counts
+    LDX current_player
+    LDA opn_count, X
+    BEQ csss_check_hand
+    STA tmp8
+    TXA: ASL A: ASL A: STA tmp9
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp9: STA tmp9
+    LDY #0
+.csss_open_lp
+    CPY tmp8: BCS csss_check_hand
+    STY tmp
+    TYA: ASL A: ASL A: CLC: ADC tmp
+    CLC: ADC tmp9: TAX
+    INX
+    LDA opn_melds, X
+    \\ Check if it's a wind tile (27-30)
+    CMP #27: BCC csss_open_next
+    CMP #31: BCS csss_open_next
+    \\ It's a wind - add 3 to count (triplet in open meld)
+    TAX
+    LDA tile_counts, X: CLC: ADC #3: STA tile_counts, X
+.csss_open_next
+    LDY tmp: INY
+    JMP csss_open_lp
+.csss_check_hand
+    \\ Count wind triplets and wind pairs
+    LDX #27
+    LDA #0: STA tmp8  \\ triplet count
+    LDA #0: STA tmp9  \\ pair count
+    LDX #27
+.csss_count_lp
+    LDA tile_counts, X
+    CMP #3
+    BCC csss_not_triplet
+    \\ Count as triplet
+    INC tmp8
+    JMP csss_next_tile
+.csss_not_triplet
+    CMP #2
+    BCC csss_next_tile
+    \\ Count as pair
+    INC tmp9
+.csss_next_tile
+    INX
+    CPX #31
+    BNE csss_count_lp
+    \\ Need exactly 3 triplets and 1 pair
+    LDA tmp8
+    CMP #3
+    BNE csss_no
+    LDA tmp9
+    CMP #1
+    BNE csss_no
+    SEC
+    RTS
+.csss_no
+    CLC
     RTS
 
 
@@ -3683,7 +3842,9 @@ ORG &3000
 
     \\ Check if this is a yakuman hand
     LDA yakuman_flags
-    BEQ dsr_normal_han
+    BEQ dsr_norm
+    JMP dsr_normal_han
+.dsr_norm
 
     \\ Display yakuman type
     LDA yakuman_flags: AND #&01: BEQ dsr_no_suuk
@@ -3712,6 +3873,33 @@ ORG &3000
 .dsr_cr_dn
     JSR osnewl
 .dsr_no_cr
+
+    LDA yakuman_flags: AND #&08: BEQ dsr_no_tsui
+    LDY #0
+.dsr_tsui
+    LDA yaku_tsui_str, Y: BEQ dsr_tsui_dn
+    JSR oswrch: INY: JMP dsr_tsui
+.dsr_tsui_dn
+    JSR osnewl
+.dsr_no_tsui
+
+    LDA yakuman_flags: AND #&20: BEQ dsr_no_daiw
+    LDY #0
+.dsr_daiw
+    LDA yaku_daiw_str, Y: BEQ dsr_daiw_dn
+    JSR oswrch: INY: JMP dsr_daiw
+.dsr_daiw_dn
+    JSR osnewl
+.dsr_no_daiw
+
+    LDA yakuman_flags: AND #&10: BEQ dsr_no_shouw
+    LDY #0
+.dsr_shouw
+    LDA yaku_shouw_str, Y: BEQ dsr_shouw_dn
+    JSR oswrch: INY: JMP dsr_shouw
+.dsr_shouw_dn
+    JSR osnewl
+.dsr_no_shouw
 
     \\ Display YAKUMAN label
     LDY #0
@@ -4564,6 +4752,12 @@ ORG &3000
     EQUS "DAISANGEN", 0
 .yaku_cr_str
     EQUS "CHINROUTOU", 0
+.yaku_tsui_str
+    EQUS "TSUUISOU", 0
+.yaku_daiw_str
+    EQUS "DAISUUSHII", 0
+.yaku_shouw_str
+    EQUS "SHOUSUUSHII", 0
 .yakuman_str
     EQUS "YAKUMAN", 0
 
