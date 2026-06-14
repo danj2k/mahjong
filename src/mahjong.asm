@@ -61,6 +61,9 @@ no_seq_flag = &9F
 
 riichi_declared = &A0       \ per-player riichi flag (4 bytes)
 ippatsu_flags = &A4        \ per-player ippatsu flag (4 bytes)
+furiten_flags = &A8        \ per-player furiten flags (4 bytes)
+\ Bit 0: temporary furiten (cleared on draw)
+\ Bit 1: permanent furiten (set when riichi + discard is winning tile)
 
 \ =============================================
 ORG &3000
@@ -131,6 +134,7 @@ ORG &3000
     LDX num_tiles
     DEX
     JSR player_discard
+    JSR check_furiten_after_discard
     JSR check_ron
     BCC ml_no_ron_riichi
     JMP ml_ron
@@ -152,6 +156,7 @@ ORG &3000
     LDX current_player
     JSR ai_choose_discard
     JSR player_discard
+    JSR check_furiten_after_discard
     JSR check_ron
     BCC ml_not_ron
     JMP ml_ron
@@ -173,6 +178,7 @@ ORG &3000
     JSR game_display
     JSR human_input
     JSR player_discard
+    JSR check_furiten_after_discard
     JSR check_ron
     BCC ml_not_ron_h
     JMP ml_ron
@@ -529,6 +535,9 @@ ORG &3000
     LDA #1
     STA ippatsu_flags, X
 
+    \ Check permanent furiten for riichi
+    JSR check_furiten_for_player
+
     \ Display RIICHI message
     LDA #12: JSR oswrch
     LDY #0
@@ -586,6 +595,9 @@ ORG &3000
     LDA riichi_on_table
     CLC: ADC #1
     STA riichi_on_table
+
+    \ Check permanent furiten for riichi
+    JSR check_furiten_for_player
 
 .cra_no
     RTS
@@ -890,6 +902,76 @@ ORG &3000
     STA dora_indicator
     RTS
 
+
+\ =============================================
+\ FURITEN DETECTION
+\ =============================================
+\ Two forms of furiten:
+\ - Temporary: after discard, if your discard + your hand = winning hand,
+\   you are in temporary furiten until you draw again.
+\ - Permanent: when declaring riichi, if any of your discards + your hand
+\   = winning hand, you are permanently in furiten for the rest of the hand.
+\ A player in furiten cannot win by ron (only tsumo).
+
+\ check_furiten_for_player:
+\ Tests all discards of player in X against their hand.
+\ If any discard + hand = winning hand:
+\   If player is in riichi -> set permanent furiten (bit 1)
+\   Otherwise -> set temporary furiten (bit 0)
+\ Preserves X on entry.
+.check_furiten_for_player
+    STX tmp5                 \ save player index
+    JSR build_tile_counts    \ build counts for this player hand
+    \ Check each discard
+    JSR set_disc_ptr
+    LDY num_discards, X
+    BEQ cff_done
+    STY tmp8                 \ tmp8 = number of discards
+.cff_loop
+    DEY
+    STY tmp4                 \ save discard index
+    \ Temporarily add discard tile to counts
+    LDA (ptr), Y
+    TAX
+    INC tile_counts, X
+    \ Check if this forms a winning hand
+    JSR check_win_no_rebuild
+    \ Remove the temporary tile
+    LDY tmp4
+    LDA (ptr), Y
+    TAX
+    DEC tile_counts, X
+    BCS cff_found
+    LDY tmp4
+    CPY #0
+    BNE cff_loop
+    JMP cff_done
+.cff_found
+    \ Player is in furiten - set appropriate flag
+    LDX tmp5
+    LDA riichi_declared, X
+    BNE cff_set_perm
+    \ Set temporary furiten (bit 0)
+    LDA furiten_flags, X
+    ORA #1
+    STA furiten_flags, X
+    JMP cff_done
+.cff_set_perm
+    \ Set permanent furiten (bit 1)
+    LDA furiten_flags, X
+    ORA #2
+    STA furiten_flags, X
+.cff_done
+    LDX tmp5                 \ restore player index
+    RTS
+
+\ check_furiten_after_discard:
+\ Called after a discard to update furiten status for the discarder.
+.check_furiten_after_discard
+    LDX current_player
+    JSR check_furiten_for_player
+    RTS
+
 .game_init
     JSR wall_build
     JSR wall_shuffle
@@ -922,6 +1004,7 @@ ORG &3000
 .gi_ri
     STA riichi_declared, X
     STA ippatsu_flags, X
+    STA furiten_flags, X
     INX: CPX #NUM_PLAYERS: BNE gi_ri
     LDA #0: STA skip_draw
     LDX #0
@@ -1067,6 +1150,11 @@ ORG &3000
     JMP pd_shift
 .pd_done
     DEC num_tiles, X
+    \ Clear temporary furiten for this player
+    LDX current_player
+    LDA furiten_flags, X
+    AND #&FE              \ clear bit 0 (temp furiten)
+    STA furiten_flags, X
     RTS
 
 \ =============================================
@@ -1650,8 +1738,13 @@ ORG &3000
     LDA tmp5
     CMP #NUM_PLAYERS-1
     BEQ dpl_honba
-    \ Show R marker if player declared riichi
+    \ Show F marker if furiten, R if riichi, space otherwise
     LDY tmp5
+    LDA furiten_flags, Y
+    BEQ dpl_no_furi
+    LDA #'F': JSR oswrch
+    JMP dpl_honba
+.dpl_no_furi
     LDA riichi_declared, Y
     BEQ dpl_no_riichi
     LDA #'R': JSR oswrch
@@ -2721,6 +2814,7 @@ ORG &3000
     LDX #0
 .nr_ip
     STA ippatsu_flags, X
+    STA furiten_flags, X
     INX: CPX #NUM_PLAYERS: BNE nr_ip
     CLC: RTS
 .nr_game_over
@@ -2782,6 +2876,9 @@ ORG &3000
 
 .press_key_str
     EQUS "Press any key...", 0
+.furiten_msg
+    EQUS "FURITEN!", 0
+
 .drawn_str
     EQUS "DRAW - Wall Exhausted", 0
 .winner_str
