@@ -1726,6 +1726,13 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_hh
 .gd_hh_dn
+    \ Print seat wind in brackets
+    LDA #' ': JSR oswrch
+    LDA #'(': JSR oswrch
+    LDA seat_winds
+    JSR tile_num_char: JSR oswrch
+    LDA #')': JSR oswrch
+    LDA #':': JSR oswrch
     JSR osnewl
 
     \ Hand top row (numbers/symbols)
@@ -1758,6 +1765,13 @@ ORG &3000
     JSR oswrch: INY
     JMP gd_mydi
 .gd_mydi_dn
+    \ Print seat wind in brackets
+    LDA #' ': JSR oswrch
+    LDA #'(': JSR oswrch
+    LDA seat_winds
+    JSR tile_num_char: JSR oswrch
+    LDA #')': JSR oswrch
+    LDA #':': JSR oswrch
     LDX #0
     JSR set_disc_ptr
     LDY num_discards, X
@@ -1773,7 +1787,10 @@ ORG &3000
     LDA #' ': JSR oswrch
     INY: JMP gd_my_lp
 .gd_mydisc_nl
-    JSR osnewl: JSR osnewl
+    JSR osnewl
+    \ Show human open melds
+    LDX #0
+    JSR disp_open_melds
 
     \ AI discards (players 1-3)
     LDX #1
@@ -1783,6 +1800,11 @@ ORG &3000
     LDA #'P': JSR oswrch
     TXA: CLC: ADC #'1'
     JSR oswrch
+    \ Print seat wind in brackets
+    PHA
+    LDA seat_winds, X
+    JSR tile_num_char: JSR oswrch
+    PLA
     LDA #':': JSR oswrch
     LDA #' ': JSR oswrch
     JSR set_disc_ptr
@@ -1801,6 +1823,11 @@ ORG &3000
     INY: JMP gd_d_lp
 .gd_disc_nl
     JSR osnewl
+    \ Show open melds for this AI player
+    LDA tmp7: PHA
+    LDX tmp7
+    JSR disp_open_melds
+    PLA: STA tmp7
     LDX tmp7
     INX
     JMP gd_disc_lp
@@ -1889,6 +1916,21 @@ ORG &3000
     JSR tile_num_char: JSR oswrch
     LDA dora_indicator
     JSR tile_suit_char: JSR oswrch
+    \ Print wall remaining count
+    LDA #' ': JSR oswrch
+    LDA #'W': JSR oswrch
+    LDA #':': JSR oswrch
+    LDA #DORA_START
+    SEC: SBC wall_pos
+    \ Print as 2-digit decimal
+    LDX #0
+.wc10
+    CMP #10: BCC wc10dn
+    SEC: SBC #10: INX: JMP wc10
+.wc10dn
+    PHA
+    TXA: CLC: ADC #'0': JSR oswrch
+    PLA: CLC: ADC #'0': JSR oswrch
     RTS
 
 \ Print 16-bit value as 5 decimal digits
@@ -2926,6 +2968,80 @@ ORG &3000
     SEC: RTS
 
 \ =============================================
+\ OPEN MELDS DISPLAY
+\ =============================================
+\ Display open melds for a player compactly.
+\ X = player number. Prints nothing if no melds.
+\ Format: " Open:P5m K7s A3p"
+\ Meld type: P=pon, K=closed kan, A=added kan
+
+.disp_open_melds
+    LDA opn_count, X
+    BEQ dom_done
+
+    \ Save player number
+    TXA: PHA
+
+    \ Calculate base offset into opn_melds: player * 20
+    TXA: ASL A: ASL A          \ * 4
+    STA tmp4
+    TXA: ASL A: ASL A: ASL A: ASL A \ * 16
+    CLC: ADC tmp4              \ = * 20
+    STA tmp4                   \ tmp4 = base offset
+
+    \ Print " Open:" label
+    LDA #' ': JSR oswrch
+    LDA #'O': JSR oswrch
+    LDA #'p': JSR oswrch
+    LDA #':': JSR oswrch
+
+    \ Get meld count and start loop
+    PLA: TAX                   \ restore player number
+    LDA opn_count, X
+    TAY: DEY                   \ Y = last meld index
+
+.dom_loop
+    \ Calculate meld offset: tmp4 + Y * 5
+    STY tmp5                   \ save meld index
+    LDA tmp5
+    ASL A: ASL A               \ * 4
+    CLC: ADC tmp5              \ * 5
+    CLC: ADC tmp4              \ + base offset
+    TAX                        \ X = offset into opn_melds
+
+    \ Print type letter
+    LDA opn_melds, X
+    CMP #3: BEQ dom_kan
+    CMP #4: BEQ dom_ak
+    LDA #'P': JSR oswrch       \ type 1 = pon
+    JMP dom_tiles
+.dom_kan
+    LDA #'K': JSR oswrch       \ type 3 = closed kan
+    JMP dom_tiles
+.dom_ak
+    LDA #'A': JSR oswrch       \ type 4 = added kan
+
+.dom_tiles
+    \ Print first tile in 2-char format
+    INX
+    LDA opn_melds, X
+    PHA
+    JSR tile_num_char: JSR oswrch
+    PLA
+    JSR tile_suit_char: JSR oswrch
+
+    \ Space between melds
+    LDA #' ': JSR oswrch
+
+    \ Next meld
+    LDY tmp5
+    CPY #0
+    BNE dom_loop
+
+.dom_done
+    RTS
+
+\ =============================================
 \ DATA
 \ =============================================
 
@@ -2933,10 +3049,10 @@ ORG &3000
     EQUS "RIICHI MAHJONG", 0
 
 .hand_hdr_str
-    EQUS "Your Hand:", 0
+    EQUS "Your Hand", 0
 
 .my_disc_str
-    EQUS "Your Disc:", 0
+    EQUS "Your Disc", 0
 
 .inst_str
     EQUS "1-9,0,A-D discard Q quit", 0
