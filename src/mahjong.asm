@@ -27,6 +27,8 @@ HAND_SIZE = 14
 MAX_DISC = 24
 MAX_OPEN_MELDS = 4
 MELD_SIZE = 5
+DEAD_WALL_SIZE = 14
+DORA_START = TOTAL_TILES - DEAD_WALL_SIZE
 
 \ Zero page
 ptr = &70
@@ -84,7 +86,11 @@ ORG &3000
     BCC ml_not_tsumo
     JMP ml_tsumo
 .ml_not_tsumo
-    \ Check riichi for human player
+    JSR check_closed_kan
+    BCS ml_got_tile
+    JSR check_added_kan
+    BCS ml_got_tile
+    \\ Check riichi for human player
     LDX current_player
     CPX #0
     BNE ml_not_tsumo_ai
@@ -398,10 +404,303 @@ ORG &3000
 .rdp_dn
     RTS
 
+\\ =============================================
+\\ CLOSED KAN AND ADDED KAN
+\\ =============================================
+\\ Per Turn Sequence: CHECK CLOSED KAN, CHECK ADDED KAN
+\\ Called after tsumo check, before riichi declaration.
+\\ Returns: C set = kan declared (player needs to discard), C clear = no kan.
+
+\\ Check if current player can declare a closed kan (4 of same tile in hand).
+\\ For AI: always declares. For human: prompts Y/N.
+\\ Returns C set if kan declared.
+.check_closed_kan
+    LDX current_player
+    JSR build_tile_counts
+    LDY #0             \\ Y = tile index to scan
+
+.cck_scan
+    CPY #34: BCS cck_no
+    LDA tile_counts, Y
+    CMP #4
+    BCC cck_next
+
+    \\ Found 4 of tile Y! Check if this is a valid closed kan
+    \\ (tile must be in hand, not already part of open meld)
+    \\ Since we built tile_counts from the hand, all 4 are in hand
+
+    \\ For AI player: auto-declare
+    LDX current_player
+    CPX #0
+    BEQ cck_human_ask
+    JSR execute_closed_kan
+    SEC: RTS
+
+.cck_human_ask
+    \\ Display prompt
+    LDY #0
+.cck_prompt_lp
+    LDA closed_kan_ask, Y
+    BEQ cck_prompt_dn
+    JSR osnewl: JSR oswrch: INY
+    JMP cck_prompt_lp
+.cck_prompt_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ cck_do_it
+    CMP #'y': BEQ cck_do_it
+    \\ User said no - continue scanning for other kans
+    \\ For now, return no kan
+    JMP cck_no
+
+.cck_do_it
+    JSR execute_closed_kan
+    SEC: RTS
+
+.cck_next
+    INY
+    JMP cck_scan
+
+.cck_no
+    CLC: RTS
+
+\\ Execute closed kan: remove 4 tiles from hand, create meld, draw replacement.
+\\ Y = tile index (0-33) of the 4-of-a-kind.
+.execute_closed_kan
+    STY tmp5             \\ save tile index
+    \\ Create open meld record
+    LDX current_player
+    TXA: ASL A: ASL A
+    STA tmp6
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp6: STA tmp6   \\ tmp6 = player * 20
+    LDY opn_count, X
+    TYA: ASL A: ASL A: CLC: ADC tmp6
+    TAX                      \\ X = offset into opn_melds
+    \\ Store meld: type 3 (closed kan), tile1, tile2, tile3, tile4
+    LDA #3: STA opn_melds, X
+    LDA tmp5
+    STA opn_melds+1, X
+    STA opn_melds+2, X
+    STA opn_melds+3, X
+    STA opn_melds+4, X
+    \\ Increment meld count
+    LDX current_player
+    INC opn_count, X
+
+    \\ Remove 4 copies of tmp5 from hand
+    LDA #4: STA tmp8
+.cck_rm_lp
+    LDX current_player
+    JSR set_hand_ptr
+    LDY #0
+.cck_rm_find
+    LDA (ptr), Y
+    CMP tmp5: BNE cck_rm_nxt
+    JSR ep_remove_at
+    DEC tmp8
+    BNE cck_rm_lp
+    JMP cck_rm_done
+.cck_rm_nxt
+    INY
+    \\ Bounds check
+    STY tmp4
+    LDX current_player
+    LDA num_tiles, X
+    CMP tmp4
+    BCS cck_rm_find
+    JMP cck_rm_done
+.cck_rm_done
+
+    \\ Draw replacement from dead wall
+    LDA dora_count
+    CLC: ADC #DORA_START
+    TAX
+    LDA wall, X          \\ draw from end of dead wall
+    PHA
+    LDX current_player
+    JSR set_hand_ptr
+    PLA
+    LDY num_tiles, X
+    STA (ptr), Y
+    INC num_tiles, X
+
+    \\ Reveal new dora indicator
+    JSR reveal_dora
+
+    RTS
+
+\\ Check if current player can declare an added kan (4th tile for an open pon).
+.check_added_kan
+    LDX current_player
+    LDA opn_count, X
+    BEQ cak_no            \\ no open melds
+
+    \\ Build tile counts from hand
+    JSR build_tile_counts
+
+    \\ For each open meld, check if it's a pon (type 1)
+    \\ and if player has a matching tile in hand
+    LDX current_player
+    TXA: ASL A: ASL A
+    STA tmp6
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp6: STA tmp6   \\ tmp6 = player * 20
+    LDX current_player
+    LDY opn_count, X
+    BEQ cak_no
+    STY tmp7            \\ tmp7 = meld count
+
+.cak_scan
+    DEY
+    STY tmp5
+    TYA: ASL A: ASL A: CLC: ADC tmp5
+    CLC: ADC tmp6: TAX
+    INX                  \\ X points to tile1 of meld
+    LDA opn_melds, X    \\ meld type
+    CMP #1: BNE cak_next \\ only check pons (type 1)
+    INX
+    LDA opn_melds, X    \\ tile value of pon
+    TAY
+    LDA tile_counts, Y
+    BEQ cak_next        \\ player doesn't have it
+    \\ Player has the 4th tile! Check if AI or human
+
+    LDX current_player
+    CPX #0
+    BEQ cak_human_ask
+
+    \\ AI: auto-declare
+    JSR execute_added_kan
+    SEC: RTS
+
+.cak_human_ask
+    LDY #0
+.cak_prompt_lp
+    LDA added_kan_ask, Y
+    BEQ cak_prompt_dn
+    JSR osnewl: JSR oswrch: INY
+    JMP cak_prompt_lp
+.cak_prompt_dn
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ cak_do_it
+    CMP #'y': BEQ cak_do_it
+    JMP cak_next
+
+.cak_do_it
+    JSR execute_added_kan
+    SEC: RTS
+
+.cak_next
+    LDY tmp5
+    CPY #0: BNE cak_scan
+
+.cak_no
+    CLC: RTS
+
+\\ Execute added kan: remove tile from hand, update pon to kan, draw replacement.
+.execute_added_kan
+    \\ First, find the pon meld to update
+    LDX current_player
+    TXA: ASL A: ASL A
+    STA tmp6
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp6: STA tmp6
+    LDX current_player
+    LDY opn_count, X
+    STY tmp7
+.eak_meld_lp
+    DEY
+    STY tmp5
+    TYA: ASL A: ASL A: CLC: ADC tmp5
+    CLC: ADC tmp6: TAX
+    INX
+    LDA opn_melds, X
+    CMP #1: BNE eak_meld_next  \\ skip non-pons
+    INX
+    LDA opn_melds, X    \\ tile value
+    STA tmp8             \\ save tile value
+
+    \\ Check if this pon's tile is in hand
+    PHA
+    LDX current_player
+    JSR build_tile_counts
+    PLA
+    TAY
+    LDA tile_counts, Y
+    BEQ eak_meld_next   \\ not in hand
+    \\ Found it! Update meld type to 4 (added kan)
+    \\ Recalculate offset
+    LDX current_player
+    TXA: ASL A: ASL A
+    STA tmp6
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp6: STA tmp6
+    LDY tmp5
+    TYA: ASL A: ASL A: CLC: ADC tmp5
+    CLC: ADC tmp6: TAX
+    LDA #4: STA opn_melds, X  \\ type 4 = added kan
+
+    \\ Remove one copy of tile from hand
+    JSR set_hand_ptr
+    LDY #0
+.eak_rm_find
+    LDA (ptr), Y
+    CMP tmp8: BNE eak_rm_nxt
+    JSR ep_remove_at
+    JMP eak_draw
+.eak_rm_nxt
+    INY
+    STY tmp4
+    LDX current_player
+    LDA num_tiles, X
+    CMP tmp4
+    BCS eak_rm_find
+    JMP eak_draw
+
+.eak_meld_next
+    LDY tmp5
+    CPY #0: BNE eak_meld_lp
+    CLC: RTS
+
+.eak_draw
+    \\ Draw replacement from dead wall
+    LDA dora_count
+    CLC: ADC #DORA_START
+    TAX
+    LDA wall, X
+    PHA
+    LDX current_player
+    JSR set_hand_ptr
+    PLA
+    LDY num_tiles, X
+    STA (ptr), Y
+    INC num_tiles, X
+
+    \\ Reveal new dora indicator
+    JSR reveal_dora
+
+    SEC: RTS
+
+\\ Reveal next dora indicator from dead wall.
+.reveal_dora
+    INC dora_count
+    LDA dora_count
+    CLC: ADC #DORA_START
+    TAX
+    LDA wall, X
+    STA dora_indicator
+    RTS
+
 .game_init
     JSR wall_build
     JSR wall_shuffle
     JSR deal_all
+    \\ Reveal initial dora indicator from dead wall
+    LDA wall+DORA_START
+    STA dora_indicator
+    LDA #0: STA dora_count
     LDA #0: STA current_player
     \ Initialize points to 25000 for each player
     LDX #0
@@ -520,7 +819,7 @@ ORG &3000
     LDA num_tiles, X
     CMP #HAND_SIZE: BCS pd_fail
     LDX wall_pos
-    CPX #TOTAL_TILES: BCS pd_fail
+    CPX #DORA_START: BCS pd_fail
     LDA wall, X
     INC wall_pos
     LDX current_player
@@ -1162,13 +1461,21 @@ ORG &3000
     INX
     CPX #NUM_PLAYERS
     BNE dpl_lp
-    \ Print honba count
+    \\ Print honba count
     LDA #' ': JSR oswrch
     LDA #'H': JSR oswrch
     LDA #':': JSR oswrch
     LDA honba
     CLC: ADC #'0'
     JSR oswrch
+    \\ Print dora indicator
+    LDA #' ': JSR oswrch
+    LDA #'D': JSR oswrch
+    LDA #':': JSR oswrch
+    LDA dora_indicator
+    JSR tile_num_char: JSR oswrch
+    LDA dora_indicator
+    JSR tile_suit_char: JSR oswrch
     RTS
 
 \ Print 16-bit value as 5 decimal digits
@@ -2183,6 +2490,10 @@ ORG &3000
     JSR wall_build
     JSR wall_shuffle
     JSR deal_all
+    \\ Reveal initial dora indicator from dead wall
+    LDA wall+DORA_START
+    STA dora_indicator
+    LDA #0: STA dora_count
     LDA #0: STA current_player: STA skip_draw
     LDA #0: STA tsumo_flag: STA ron_flag
     LDX #0
@@ -2238,6 +2549,12 @@ ORG &3000
     EQUS "Need 1000+ pts!", 0
 .riichi_no_close
     EQUS "Must be closed!", 0
+
+.closed_kan_ask
+    EQUS "Declare Closed Kan? (Y/N)", 0
+
+.added_kan_ask
+    EQUS "Declare Added Kan? (Y/N)", 0
 
 .press_key_str
     EQUS "Press any key...", 0
@@ -2332,6 +2649,9 @@ ORG &3000
 .tsumo_flag EQUB 0
 .ron_flag EQUB 0
 .ron_player EQUB 0
+
+.dora_indicator EQUB 0
+.dora_count EQUB 0
 
 .end
 
