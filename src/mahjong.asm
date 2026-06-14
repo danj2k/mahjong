@@ -57,6 +57,9 @@ tile_counts = &7C
 tmp9 = &9E
 no_seq_flag = &9F
 
+riichi_declared = &A0       \ per-player riichi flag (4 bytes)
+ippatsu_flags = &A4        \ per-player ippatsu flag (4 bytes)
+
 \ =============================================
 ORG &3000
 \ =============================================
@@ -81,6 +84,23 @@ ORG &3000
     BCC ml_not_tsumo
     JMP ml_tsumo
 .ml_not_tsumo
+    \ Check riichi for human player
+    LDX current_player
+    CPX #0
+    BNE ml_not_tsumo_ai
+    JSR check_riichi_human
+    BCC ml_not_tsumo_ai
+    \ Riichi declared - auto-discard drawn tile (last in hand)
+    LDX num_tiles
+    DEX
+    JSR player_discard
+    JSR check_ron
+    BCC ml_no_ron_riichi
+    JMP ml_ron
+.ml_no_ron_riichi
+    JSR advance_player
+    JMP mainloop
+.ml_not_tsumo_ai
     JMP ml_got_tile
 
 .ml_skip_draw
@@ -93,6 +113,7 @@ ORG &3000
 
     \ AI turn
     JSR sort_hand
+    JSR check_riichi_ai
     JSR ai_choose_discard
     JSR player_discard
     JSR check_ron
@@ -231,6 +252,152 @@ ORG &3000
 \ GAME INITIALIZATION
 \ =============================================
 
+
+\ =============================================
+\ RIICHI DECLARATION
+\ =============================================
+\ Check if human player can declare riichi.
+\ Conditions: closed hand (no open melds), 1000+ points, not already declared.
+\ If eligible, prompts Y/N and deducts 1000 points + places riichi stick.
+\ Returns: C set = riichi declared, C clear = no riichi.
+
+.check_riichi_human
+    \ Already declared?
+    LDX current_player
+    LDA riichi_declared, X
+    BNE crh_no
+
+    \ Must have closed hand (no open melds)
+    LDA opn_count, X
+    BNE crh_open
+
+    \ Must have 1000+ points
+    TXA: ASL A: TAX
+    LDA player_points+1, X
+    CMP #>1000
+    BCC crh_nopoints
+    BNE crh_enough
+    LDA player_points, X
+    CMP #<1000
+    BCC crh_nopoints
+.crh_enough
+
+    \ Display riichi prompt
+    JSR riichi_display_prompt
+
+    \ Read Y/N key
+    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    JSR osrdch
+    CMP #'Y': BEQ crh_declare
+    CMP #'y': BEQ crh_declare
+
+.crh_no
+    CLC: RTS
+
+.crh_open
+    \ Could display "Must be closed!" but skip for now
+    JMP crh_no
+
+.crh_nopoints
+    \ Could display "Need 1000+ pts!" but skip for now
+    JMP crh_no
+
+.crh_declare
+    \ Deduct 1000 points from player
+    LDX current_player
+    TXA: ASL A: TAX
+    LDA player_points, X
+    SEC: SBC #<1000
+    STA player_points, X
+    LDA player_points+1, X
+    SBC #>1000
+    STA player_points+1, X
+
+    \ Place riichi stick on table
+    LDX current_player
+    LDA #1
+    STA riichi_declared, X
+    LDA riichi_on_table
+    CLC: ADC #1
+    STA riichi_on_table
+
+    \ Set ippatsu flag (bonus if win within one full rotation)
+    LDX current_player
+    LDA #1
+    STA ippatsu_flags, X
+
+    \ Display RIICHI message
+    LDA #12: JSR oswrch
+    LDY #0
+.crh_msg
+    LDA riichi_msg, Y
+    BEQ crh_msg_dn
+    JSR oswrch: INY
+    JMP crh_msg
+.crh_msg_dn
+    JSR osnewl
+    \ Brief pause
+    LDX #0: LDY #0
+.crh_pause
+    DEY: BNE crh_pause
+    DEX: BNE crh_pause
+
+    SEC: RTS
+
+\ Check if AI player can declare riichi.
+\ AI always declares if eligible (closed hand + 1000+ pts).
+.check_riichi_ai
+    LDX current_player
+    \ Already declared?
+    LDA riichi_declared, X
+    BNE cra_no
+    \ Must have closed hand
+    LDA opn_count, X
+    BNE cra_no
+    \ Must have 1000+ points
+    TXA: ASL A: TAX
+    LDA player_points+1, X
+    CMP #>1000
+    BCC cra_no
+    BNE cra_enough
+    LDA player_points, X
+    CMP #<1000
+    BCC cra_no
+.cra_enough
+
+    \ Deduct 1000 points
+    LDX current_player
+    TXA: ASL A: TAX
+    LDA player_points, X
+    SEC: SBC #<1000
+    STA player_points, X
+    LDA player_points+1, X
+    SBC #>1000
+    STA player_points+1, X
+
+    \ Set riichi flags
+    LDX current_player
+    LDA #1
+    STA riichi_declared, X
+    STA ippatsu_flags, X
+    LDA riichi_on_table
+    CLC: ADC #1
+    STA riichi_on_table
+
+.cra_no
+    RTS
+
+\ Display riichi prompt for human player
+.riichi_display_prompt
+    LDY #0
+.rdp_lp
+    LDA riichi_ask, Y
+    BEQ rdp_dn
+    JSR oswrch: INY
+    JMP rdp_lp
+.rdp_dn
+    RTS
+
 .game_init
     JSR wall_build
     JSR wall_shuffle
@@ -249,6 +416,11 @@ ORG &3000
     STA riichi_sticks, X
     INX: CPX #NUM_PLAYERS: BNE gi_rs
     STA riichi_on_table
+    LDX #0
+.gi_ri
+    STA riichi_declared, X
+    STA ippatsu_flags, X
+    INX: CPX #NUM_PLAYERS: BNE gi_ri
     LDA #0: STA skip_draw
     LDX #0
 .gi_opn
@@ -976,6 +1148,14 @@ ORG &3000
     LDA tmp5
     CMP #NUM_PLAYERS-1
     BEQ dpl_honba
+    \ Show R marker if player declared riichi
+    STX tmp5
+    LDX tmp5
+    LDA riichi_declared, X
+    BEQ dpl_no_riichi
+    LDA #'R': JSR oswrch
+    JMP dpl_honba
+.dpl_no_riichi
     LDA #' ': JSR oswrch
 .dpl_honba
     LDX tmp5
@@ -2005,6 +2185,10 @@ ORG &3000
     JSR deal_all
     LDA #0: STA current_player: STA skip_draw
     LDA #0: STA tsumo_flag: STA ron_flag
+    LDX #0
+.nr_ip
+    STA ippatsu_flags, X
+    INX: CPX #NUM_PLAYERS: BNE nr_ip
     RTS
 
 \ =============================================
@@ -2046,6 +2230,15 @@ ORG &3000
     EQUS "Fu: ", 0
 .score_lbl
     EQUS "Score: ", 0
+.riichi_msg
+    EQUS "RIICHI!", 0
+.riichi_ask
+    EQUS "Declare Riichi? (Y/N)", 0
+.riichi_no_pts
+    EQUS "Need 1000+ pts!", 0
+.riichi_no_close
+    EQUS "Must be closed!", 0
+
 .press_key_str
     EQUS "Press any key...", 0
 
