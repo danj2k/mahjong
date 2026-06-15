@@ -17,6 +17,7 @@
 
 oswrch = &FFEE
 osnewl = &FFE7
+oscli = &FFF7
 osrdch = &FFE0
 osbyte = &FFF4
 
@@ -383,7 +384,10 @@ ORG &3000
     JSR game_display
     JMP mainloop
 .quit
-    LDA #12: JSR oswrch
+    LDA #12: JSR oswrch    ; clear screen
+    LDX #<quit_cmd         ; X = low byte of command string address
+    LDY #>quit_cmd         ; Y = high byte of command string address
+    JSR oscli              ; call OSCLI to return to BASIC
     RTS
 
 ; =============================================
@@ -5529,6 +5533,9 @@ ORG &3000
 
 .game_over_str
     EQUS "GAME OVER", 0
+
+.quit_cmd
+    EQUS "BASIC", 13
 
 .tsumo_msg
     EQUS "TSUMO!", 0
