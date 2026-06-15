@@ -1065,7 +1065,7 @@ ORG &3000
     CMP #'y': BEQ cck_do_it
     ; User said no - continue scanning for other kans
     LDY tmp9
-    JMP cck_scan
+    JMP cck_next    ; Y = tmp9, then INY + JMP cck_scan
 
 .cck_do_it
     JSR execute_closed_kan
