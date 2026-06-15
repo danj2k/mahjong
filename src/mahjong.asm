@@ -356,7 +356,6 @@ ORG &3000
     JSR oswrch: INY
     JMP go_pk
 .go_pk_dn
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     ; Reset game and restart
     JSR game_init
@@ -372,9 +371,7 @@ ORG &3000
 ; Returns position (0-based) in X
 ; =============================================
 .human_input
-    ; Acknowledge one buffered key (clear stale chars)
-    LDA #&7E: LDX #0: JSR osbyte
-    ; Now wait for a new keypress
+    ; Wait for a new keypress
     JSR osrdch
     CMP #'Q': BEQ quit
     CMP #'q': BEQ quit
@@ -576,15 +573,6 @@ ORG &3000
     JSR oswrch: INY
     JMP ds_prompt_lp
 .ds_prompt_dn
-    ; Clear keyboard buffer and wait for held keys to expire
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
-    ; Delay ~100ms (200K cycles at 2MHz) for type_input key to release
-    LDX #0: LDY #8
-.ds_delay
-    DEX: BNE ds_delay
-    DEY: BNE ds_delay
-    ; Clear buffer again after delay
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     ; Wait for keypress
     JSR osrdch
     ; Check 1, 2, 3
@@ -649,15 +637,6 @@ ORG &3000
     JSR osnewl: INY
     JMP ps_prompt_lp
 .ps_prompt_dn
-    ; Clear keyboard buffer and wait for held keys to expire
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
-    ; Delay ~100ms for type_input key to release
-    LDX #0: LDY #8
-.ps_delay
-    DEX: BNE ps_delay
-    DEY: BNE ps_delay
-    ; Clear buffer again after delay
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     ; Wait for keypress
     JSR osrdch
     ; Check 1, 2
@@ -852,7 +831,6 @@ ORG &3000
     JSR riichi_display_prompt
 
     ; Read Y/N key
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ crh_declare
     CMP #'y': BEQ crh_declare
@@ -1051,7 +1029,6 @@ ORG &3000
     LDA tmp9: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
     ; Wait for key
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ cck_do_it
     CMP #'y': BEQ cck_do_it
@@ -1205,7 +1182,6 @@ ORG &3000
     LDA tmp8: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
     ; Wait for key
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ cak_do_it
     CMP #'y': BEQ cak_do_it
@@ -1895,7 +1871,6 @@ ORG &3000
     JSR oswrch: INY
     JMP shp_lp
 .shp_dn
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ shp_yes
     CMP #'y': BEQ shp_yes
@@ -1913,7 +1888,6 @@ ORG &3000
     JSR oswrch: INY
     JMP shc_lp
 .shc_dn
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ shc_yes
     CMP #'y': BEQ shc_yes
@@ -1931,7 +1905,6 @@ ORG &3000
     JSR oswrch: INY
     JMP shk_lp
 .shk_dn
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     CMP #'Y': BEQ shk_yes
     CMP #'y': BEQ shk_yes
@@ -4687,7 +4660,6 @@ ORG &3000
     LDA press_key_str, Y: BEQ dsr_pk_dn
     JSR oswrch: INY: JMP dsr_pk
 .dsr_pk_dn
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     RTS
 
@@ -4787,7 +4759,6 @@ ORG &3000
     JSR advance_round
     BCS nr_game_over    ; if advance_round returned carry set (error/true)
     ; Clear keyboard buffer and wait for user to see score
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     ; Rebuild wall
     JSR wall_build
@@ -5207,7 +5178,6 @@ ORG &3000
     LDA #'s': JSR oswrch
     JSR osnewl
     ; Wait for keypress
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
     JSR osrdch
     RTS
 
