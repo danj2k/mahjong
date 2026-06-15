@@ -1751,9 +1751,8 @@ ORG &3000
     DEY
 .ctfp_loop
     LDA (ptr), Y
-    PHA: TAX
+    TAX
     INC tile_counts, X
-    PLA: TAY
     DEY
     BPL ctfp_loop
 .ctfp_done
