@@ -87,7 +87,7 @@ ORG &3000
     LDY #0
 .draw_msg
     LDA drawn_str, Y
-    BEQ draw_msg_dn    ; branch if zero (equal)
+    BEQ draw_msg_dn    ; end of string
     JSR oswrch: INY
     JMP draw_msg
 .draw_msg_dn
@@ -96,8 +96,8 @@ ORG &3000
     INC honba: INC hands_played
     ; Check game end
     LDA hands_played
-    CMP #8    ; compare against 8
-    BCC draw_new    ; if accumulator < #8
+    CMP #8    ; check if max hands reached
+    BCC draw_new    ; under 8 hands - game continues
     SEC: JMP game_over
 .draw_new
     JSR new_round
@@ -149,8 +149,8 @@ ORG &3000
 .ml_no_kan
     ; Check riichi for human player
     LDX current_player
-    CPX #0    ; compare against zero
-    BNE ml_got_tile    ; if accumulator != #0
+    CPX #0    ; check if human player
+    BNE ml_got_tile    ; AI player - skip human riichi prompt
     JSR check_riichi_human
     BCC ml_got_tile    ; if check_riichi_human returned carry clear (OK/false)
     ; Riichi declared - check for illegal riichi (chombo)
@@ -178,8 +178,8 @@ ORG &3000
 
 .ml_got_tile
     LDX current_player
-    CPX #0    ; compare against zero
-    BEQ ml_human    ; if accumulator == #0
+    CPX #0    ; check if human player
+    BEQ ml_human    ; human player - go to input handler
 
     ; AI turn
     JSR sort_hand
@@ -306,7 +306,7 @@ ORG &3000
     LDY #0
 .go_lp
     LDA game_over_str, Y
-    BEQ go_dn    ; branch if zero (equal)
+    BEQ go_dn    ; end of string
     JSR oswrch: INY
     JMP go_lp
 .go_dn
@@ -319,17 +319,17 @@ ORG &3000
     LDX #1
 .go_find_lp
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BCS go_show_winner    ; if accumulator >= #NUM_PLAYERS
+    BCS go_show_winner    ; all players checked - show winner
     STX tmp6
     TXA: ASL A: TAX
     LDA player_points+1, X
     LDY tmp5: TYA: ASL A: TAY
     CMP player_points+1, Y    ; compare against player points
-    BCC go_find_next    ; if accumulator < player_points+1,
-    BNE go_new_high    ; branch if not zero (not equal)
+    BCC go_find_next    ; current player has fewer points
+    BNE go_new_high    ; new high score found
     LDA player_points, X
     CMP player_points, Y    ; compare against player points
-    BCC go_find_next    ; if accumulator < player_points,
+    BCC go_find_next    ; current player has fewer points
 .go_new_high
     LDX tmp6: STX tmp5
 .go_find_next
@@ -339,7 +339,7 @@ ORG &3000
     LDY #0
 .go_w_lp
     LDA winner_str, Y
-    BEQ go_w_dn    ; branch if zero (equal)
+    BEQ go_w_dn    ; end of string
     JSR oswrch: INY
     JMP go_w_lp
 .go_w_dn
@@ -351,7 +351,7 @@ ORG &3000
     LDY #0
 .go_pk
     LDA press_key_str, Y
-    BEQ go_pk_dn    ; branch if zero (equal)
+    BEQ go_pk_dn    ; end of string
     JSR oswrch: INY
     JMP go_pk
 .go_pk_dn
@@ -432,7 +432,7 @@ ORG &3000
 .ph_inner
     CPX #34: BCS ph_inner_dn
     LDA tile_counts, X
-    BEQ ph_inner_next    ; branch if zero (equal)
+    BEQ ph_inner_next    ; no tiles of this type - skip
     INC tmp6
 .ph_inner_next
     INX: JMP ph_inner
@@ -441,7 +441,7 @@ ORG &3000
     ; Compare with best
     LDA tmp6
     CMP tmp: BCC ph_skip
-    BEQ ph_skip    ; if accumulator == tmp:
+    BEQ ph_skip    ; zero - condition met
     STA tmp
     LDA tmp3: STA tmp2
 .ph_skip
@@ -454,7 +454,7 @@ ORG &3000
     LDY #0
 .ph_hdr_lp
     LDA ph_hdr_str, Y
-    BEQ ph_hdr_dn    ; branch if zero (equal)
+    BEQ ph_hdr_dn    ; end of string
     JSR oswrch: INY
     JMP ph_hdr_lp
 .ph_hdr_dn
@@ -466,7 +466,7 @@ ORG &3000
     LDY #0
 .ph_mid_lp
     LDA ph_mid_str, Y
-    BEQ ph_mid_dn    ; branch if zero (equal)
+    BEQ ph_mid_dn    ; end of string
     JSR oswrch: INY
     JMP ph_mid_lp
 .ph_mid_dn
@@ -475,7 +475,7 @@ ORG &3000
     LDY #0
 .ph_end_lp
     LDA ph_end_str, Y
-    BEQ ph_end_dn    ; branch if zero (equal)
+    BEQ ph_end_dn    ; end of string
     JSR oswrch: INY
     JMP ph_end_lp
 .ph_end_dn
@@ -497,8 +497,8 @@ ORG &3000
 .advance_player
     INC current_player
     LDA current_player
-    CMP #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BNE ap_dn    ; if accumulator != #NUM_PLAYERS
+    CMP #NUM_PLAYERS    ; check if past last player
+    BNE ap_dn    ; not zero - condition not met
     LDA #0: STA current_player
 .ap_dn
     RTS
@@ -515,11 +515,11 @@ ORG &3000
     LDY #0
 .adl3
     DEY
-    BNE adl3    ; branch if not zero (not equal)
+    BNE adl3    ; inner delay not done
     DEX
-    BNE adl2    ; branch if not zero (not equal)
+    BNE adl2    ; middle delay not done
     DEC tmp7
-    BNE adl1    ; branch if not zero (not equal)
+    BNE adl1    ; outer delay not done
     RTS
 
 ; =============================================
@@ -535,7 +535,7 @@ ORG &3000
     LDY #0
 .ds_title_lp
     LDA diff_title, Y
-    BEQ ds_title_dn    ; branch if zero (equal)
+    BEQ ds_title_dn    ; end of string
     JSR oswrch: INY
     JMP ds_title_lp
 .ds_title_dn
@@ -544,7 +544,7 @@ ORG &3000
     LDY #0
 .ds_opt1_lp
     LDA diff_novice, Y
-    BEQ ds_opt1_dn    ; branch if zero (equal)
+    BEQ ds_opt1_dn    ; end of string
     JSR oswrch: INY
     JMP ds_opt1_lp
 .ds_opt1_dn
@@ -553,7 +553,7 @@ ORG &3000
     LDY #0
 .ds_opt2_lp
     LDA diff_inter, Y
-    BEQ ds_opt2_dn    ; branch if zero (equal)
+    BEQ ds_opt2_dn    ; end of string
     JSR oswrch: INY
     JMP ds_opt2_lp
 .ds_opt2_dn
@@ -562,7 +562,7 @@ ORG &3000
     LDY #0
 .ds_opt3_lp
     LDA diff_expert, Y
-    BEQ ds_opt3_dn    ; branch if zero (equal)
+    BEQ ds_opt3_dn    ; end of string
     JSR oswrch: INY
     JMP ds_opt3_lp
 .ds_opt3_dn
@@ -571,7 +571,7 @@ ORG &3000
     LDY #0
 .ds_prompt_lp
     LDA diff_prompt, Y
-    BEQ ds_prompt_dn    ; branch if zero (equal)
+    BEQ ds_prompt_dn    ; end of string
     JSR oswrch: INY
     JMP ds_prompt_lp
 .ds_prompt_dn
@@ -617,7 +617,7 @@ ORG &3000
     LDY #0
 .ps_title_lp
     LDA pract_title, Y
-    BEQ ps_title_dn    ; branch if zero (equal)
+    BEQ ps_title_dn    ; end of string
     JSR oswrch: INY
     JMP ps_title_lp
 .ps_title_dn
@@ -626,7 +626,7 @@ ORG &3000
     LDY #0
 .ps_opt1_lp
     LDA pract_off, Y
-    BEQ ps_opt1_dn    ; branch if zero (equal)
+    BEQ ps_opt1_dn    ; end of string
     JSR oswrch: INY
     JMP ps_opt1_lp
 .ps_opt1_dn
@@ -635,7 +635,7 @@ ORG &3000
     LDY #0
 .ps_opt2_lp
     LDA pract_on, Y
-    BEQ ps_opt2_dn    ; branch if zero (equal)
+    BEQ ps_opt2_dn    ; end of string
     JSR oswrch: INY
     JMP ps_opt2_lp
 .ps_opt2_dn
@@ -644,7 +644,7 @@ ORG &3000
     LDY #0
 .ps_prompt_lp
     LDA pract_prompt, Y
-    BEQ ps_prompt_dn    ; branch if zero (equal)
+    BEQ ps_prompt_dn    ; end of string
     JSR osnewl: INY
     JMP ps_prompt_lp
 .ps_prompt_dn
@@ -692,11 +692,11 @@ ORG &3000
     ; Determine if it was a draw (wall exhausted)
     LDA tsumo_flag
     ORA ron_flag
-    BEQ ar_draw    ; branch if zero (equal)
+    BEQ ar_draw    ; no winner - it was a draw
 
     ; Was a win - check if dealer won
     LDA tsumo_flag
-    BNE ar_tsumo    ; branch if not zero (not equal)
+    BNE ar_tsumo    ; self-draw win - get winner
     ; Ron: winner = ron_player
     LDX ron_player
     JMP ar_got_winner
@@ -706,14 +706,14 @@ ORG &3000
 .ar_got_winner
     ; Check if winner is dealer
     CPX dealer    ; compare against dealer
-    BEQ ar_dealer_won    ; if accumulator == dealer
+    BEQ ar_dealer_won    ; winner is dealer - stay as dealer
 
     ; Non-dealer won: advance dealer, reset honba
     LDA #0: STA honba
     LDX dealer
     INX
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BNE ar_no_wrap    ; if accumulator != #NUM_PLAYERS
+    BNE ar_no_wrap    ; no wrap needed
     LDX #0
 .ar_no_wrap
     STX dealer
@@ -733,8 +733,8 @@ ORG &3000
     LDX #0
 .ar_seat_lp
     TXA: CLC: ADC dealer
-    CMP #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BCC ar_no_wrap2    ; if accumulator < #NUM_PLAYERS
+    CMP #NUM_PLAYERS    ; check if all 4 players dealt
+    BCC ar_no_wrap2    ; carry clear
     SEC: SBC #NUM_PLAYERS
 .ar_no_wrap2
     TAY                         ; Y = position relative to dealer
@@ -742,13 +742,13 @@ ORG &3000
     STA seat_winds, Y
     INX
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BNE ar_seat_lp    ; if accumulator != #NUM_PLAYERS
+    BNE ar_seat_lp    ; more players to assign seat winds
 
     ; Check for game end
     ; Game ends when hands_played >= 8 (completed South 4)
     ; unless the dealer just won (extends by one more hand)
     LDA hands_played
-    CMP #8    ; compare against 8
+    CMP #8    ; check if max hands reached
     BCC ar_not_over            ; less than 8 hands: continue
 
     ; 8+ hands played - check if dealer won (extends game)
@@ -757,7 +757,7 @@ ORG &3000
     BEQ ar_not_over           ; draw doesn't extend
     LDX #0
     LDA tsumo_flag
-    BNE ar_chk_winner    ; branch if not zero (not equal)
+    BNE ar_chk_winner    ; tsumo win - check if dealer won
     LDX ron_player
     JMP ar_chk_dealer
 .ar_chk_winner
@@ -773,8 +773,8 @@ ORG &3000
 .ar_not_over
     ; Safety: end game at 12 hands maximum (South All-Stars limit)
     LDA hands_played
-    CMP #12    ; compare against 12
-    BCC ar_continue    ; if accumulator < #12
+    CMP #12    ; check absolute maximum hands
+    BCC ar_continue    ; under the hard limit - continue game
     SEC
     RTS
 
@@ -806,9 +806,9 @@ ORG &3000
 .check_chombo_riichi
     LDX current_player
     LDA riichi_declared, X
-    BEQ ccri_not_riichi    ; branch if zero (equal)
+    BEQ ccri_not_riichi    ; player hasn't declared riichi
     LDA opn_count, X
-    BEQ ccri_valid    ; branch if zero (equal)
+    BEQ ccri_valid    ; hand is closed - riichi valid
     ; Riichi with open hand = chombo
     SEC: RTS
 .ccri_not_riichi
@@ -830,21 +830,21 @@ ORG &3000
     ; Already declared?
     LDX current_player
     LDA riichi_declared, X
-    BNE crh_no    ; branch if not zero (not equal)
+    BNE crh_no    ; already declared riichi
 
     ; Must have closed hand (no open melds)
     LDA opn_count, X
-    BNE crh_open    ; branch if not zero (not equal)
+    BNE crh_open    ; hand is open - riichi not allowed
 
     ; Must have 1000+ points
     TXA: ASL A: TAX
     LDA player_points+1, X
     CMP #>1000    ; compare against >1000
-    BCC crh_nopoints    ; if accumulator < #>1000
-    BNE crh_enough    ; branch if not zero (not equal)
+    BCC crh_nopoints    ; not enough points for riichi
+    BNE crh_enough    ; high byte larger - definitely enough
     LDA player_points, X
     CMP #<1000    ; compare against <1000
-    BCC crh_nopoints    ; if accumulator < #<1000
+    BCC crh_nopoints    ; not enough points for riichi
 .crh_enough
 
     ; Display riichi prompt
@@ -899,7 +899,7 @@ ORG &3000
     LDY #0
 .crh_msg
     LDA riichi_msg, Y
-    BEQ crh_msg_dn    ; branch if zero (equal)
+    BEQ crh_msg_dn    ; end of string
     JSR oswrch: INY
     JMP crh_msg
 .crh_msg_dn
@@ -918,17 +918,17 @@ ORG &3000
     LDX current_player
     ; Already declared?
     LDA riichi_declared, X
-    BNE cra_no    ; branch if not zero (not equal)
+    BNE cra_no    ; AI can't declare riichi here
     ; Must have closed hand
     LDA opn_count, X
-    BNE cra_no    ; branch if not zero (not equal)
+    BNE cra_no    ; AI can't declare riichi here
     ; Novice AI: always declares riichi if eligible
     LDA ai_difficulty
     BEQ cra_enough      ; 0 = novice, always riichi
     ; Intermediate: only riichi if hand has good tiles (>= 4 pairs or 3+ sequences)
     ; For now, intermediate and expert both skip riichi AI (conservative)
-    CMP #1    ; compare against 1
-    BEQ cra_intermediate    ; if accumulator == #1
+    CMP #1    ; check if intermediate difficulty
+    BEQ cra_intermediate    ; zero - condition met
     ; Expert: only riichi when hand is very strong (1000+ pts AND more than 2 open melds would be bad)
     ; Conservative: skip riichi for expert too - too complex to evaluate hand quality here
     JMP cra_no
@@ -940,8 +940,8 @@ ORG &3000
 .cra_pair_lp
     CPY #34: BCS cra_inter_done
     LDA tile_counts, Y
-    CMP #2    ; compare against 2
-    BCC cra_pair_next    ; if accumulator < #2
+    CMP #2    ; check if enough for a pair
+    BCC cra_pair_next    ; carry clear
     INC tmp6
 .cra_pair_next
     INY
@@ -950,17 +950,17 @@ ORG &3000
     ; Need at least 3 pairs to consider riichi
     LDX tmp5
     LDA tmp6
-    CMP #3    ; compare against 3
+    CMP #3    ; need 3+ copies for triplet
     BCC cra_no          ; fewer than 3 pairs: don't riichi
     ; Must have 1000+ points
     TXA: ASL A: TAX
     LDA player_points+1, X
     CMP #>1000    ; compare against >1000
-    BCC cra_no    ; if accumulator < #>1000
-    BNE cra_enough    ; branch if not zero (not equal)
+    BCC cra_no    ; not enough points
+    BNE cra_enough    ; high byte bigger - enough points
     LDA player_points, X
     CMP #<1000    ; compare against <1000
-    BCC cra_no    ; if accumulator < #<1000
+    BCC cra_no    ; not enough points
 .cra_enough
 
     ; Deduct 1000 points
@@ -993,7 +993,7 @@ ORG &3000
     LDY #0
 .rdp_lp
     LDA riichi_ask, Y
-    BEQ rdp_dn    ; branch if zero (equal)
+    BEQ rdp_dn    ; end of string
     JSR oswrch: INY
     JMP rdp_lp
 .rdp_dn
@@ -1017,8 +1017,8 @@ ORG &3000
 .cck_scan
     CPY #34: BCS cck_no
     LDA tile_counts, Y
-    CMP #4    ; compare against 4
-    BCC cck_next    ; if accumulator < #4
+    CMP #4    ; check if count is 4
+    BCC cck_next    ; fewer than 4 - no kan possible
 
     ; Found 4 of tile Y! Check if this is a valid closed kan
     ; (tile must be in hand, not already part of open meld)
@@ -1026,8 +1026,8 @@ ORG &3000
 
     ; For AI player: auto-declare
     LDX current_player
-    CPX #0    ; compare against zero
-    BEQ cck_human_ask    ; if accumulator == #0
+    CPX #0    ; check if human player
+    BEQ cck_human_ask    ; zero - condition met
     JSR execute_closed_kan
     SEC: RTS
 
@@ -1038,7 +1038,7 @@ ORG &3000
     LDY #0
 .cck_prompt_lp
     LDA closed_kan_ask, Y
-    BEQ cck_prompt_dn    ; branch if zero (equal)
+    BEQ cck_prompt_dn    ; end of string
     JSR osnewl: JSR oswrch: INY
     JMP cck_prompt_lp
 .cck_prompt_dn
@@ -1102,7 +1102,7 @@ ORG &3000
     CMP tmp5: BNE cck_rm_nxt
     JSR ep_remove_at
     DEC tmp8
-    BNE cck_rm_lp    ; branch if not zero (not equal)
+    BNE cck_rm_lp    ; more tiles to remove
     JMP cck_rm_done
 .cck_rm_nxt
     INY
@@ -1110,8 +1110,8 @@ ORG &3000
     STY tmp4
     LDX current_player
     LDA num_tiles, X
-    CMP tmp4    ; compare against tmp4
-    BCS cck_rm_find    ; if accumulator >= tmp4
+    CMP tmp4    ; check if past end of hand
+    BCS cck_rm_find    ; still within hand - keep searching
     JMP cck_rm_done
 .cck_rm_done
 
@@ -1138,7 +1138,7 @@ ORG &3000
 .check_added_kan
     LDX current_player
     LDA opn_count, X
-    BEQ cak_no    ; branch if zero (equal)
+    BEQ cak_no    ; no open melds to add kan to
     JMP cak_check
 .cak_no
     CLC: RTS
@@ -1156,7 +1156,7 @@ ORG &3000
     CLC: ADC tmp6: STA tmp6   ;\ tmp6 = player * 20
     LDX current_player
     LDY opn_count, X
-    BEQ cak_no    ; branch if zero (equal)
+    BEQ cak_no    ; no open melds to add kan to
     STY tmp7            ;\ tmp7 = meld count
 
 .cak_scan
@@ -1175,8 +1175,8 @@ ORG &3000
     ; Player has the 4th tile! Check if AI or human
 
     LDX current_player
-    CPX #0    ; compare against zero
-    BEQ cak_human_ask    ; if accumulator == #0
+    CPX #0    ; check if human player
+    BEQ cak_human_ask    ; zero - condition met
 
     ; AI: auto-declare
     JSR execute_added_kan
@@ -1188,7 +1188,7 @@ ORG &3000
     LDY #0
 .cak_prompt_lp
     LDA added_kan_ask, Y
-    BEQ cak_prompt_dn    ; branch if zero (equal)
+    BEQ cak_prompt_dn    ; end of string
     JSR osnewl: JSR oswrch: INY
     JMP cak_prompt_lp
 .cak_prompt_dn
@@ -1270,8 +1270,8 @@ ORG &3000
     STY tmp4
     LDX current_player
     LDA num_tiles, X
-    CMP tmp4    ; compare against tmp4
-    BCS eak_rm_find    ; if accumulator >= tmp4
+    CMP tmp4    ; check if past end of hand
+    BCS eak_rm_find    ; still within hand - keep scanning
     JMP eak_draw
 
 .eak_meld_next
@@ -1332,7 +1332,7 @@ ORG &3000
     ; Check each discard
     JSR set_disc_ptr
     LDY num_discards, X
-    BEQ cff_done    ; branch if zero (equal)
+    BEQ cff_done    ; no discards to test for furiten
     STY tmp8                 ; tmp8 = number of discards
 .cff_loop
     DEY
@@ -1348,16 +1348,16 @@ ORG &3000
     LDA (ptr), Y
     TAX
     DEC tile_counts, X
-    BCS cff_found    ; branch if carry set (>= or true)
+    BCS cff_found    ; discard + hand forms winning hand - furiten!
     LDY tmp4
     CPY #0    ; compare against zero
-    BNE cff_loop    ; if accumulator != #0
+    BNE cff_loop    ; more discards to test
     JMP cff_done
 .cff_found
     ; Player is in furiten - set appropriate flag
     LDX tmp5
     LDA riichi_declared, X
-    BNE cff_set_perm    ; branch if not zero (not equal)
+    BNE cff_set_perm    ; player is in riichi - permanent furiten
     ; Set temporary furiten (bit 0)
     LDA furiten_flags, X
     ORA #1
@@ -1497,11 +1497,11 @@ ORG &3000
     STA (ptr), Y               ;\ store tile in player's hand
     INY
     CPY #INITIAL_HAND          ;\ done 13 tiles?
-    BNE da_tile    ; if accumulator != #INITIAL_HAND
+    BNE da_tile    ; not zero - condition not met
     PLA: TAX                   ;\ restore player counter
     INX
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BNE da_player    ; if accumulator != #NUM_PLAYERS
+    BNE da_player    ; not zero - condition not met
     LDA tmp: STA wall_pos
     LDX #0
 .da_ct
@@ -1610,7 +1610,7 @@ ORG &3000
 .sort_hand
     JSR set_hand_ptr
     LDA num_tiles, X
-    BEQ sr_dn    ; branch if zero (equal)
+    BEQ sr_dn    ; end of string
     SEC: SBC #1
     STA tmp4
 .sr_pass
@@ -1623,7 +1623,7 @@ ORG &3000
     INY
     LDA (ptr), Y
     CMP tmp3: BEQ sr_no
-    BCC sr_no    ; if accumulator < tmp3:
+    BCC sr_no    ; carry clear
     ; Swap
     PHA
     LDA tmp3
@@ -1770,14 +1770,14 @@ ORG &3000
     STA tile_counts, Y
     INY: CPY #34: BNE ctfp_clear
     LDY num_tiles, X
-    BEQ ctfp_done    ; branch if zero (equal)
+    BEQ ctfp_done    ; player has no tiles
     DEY
 .ctfp_loop
     LDA (ptr), Y
     TAX
     INC tile_counts, X
     DEY
-    BPL ctfp_loop    ; branch if positive/zero
+    BPL ctfp_loop    ; Y not negative yet - keep counting
 .ctfp_done
     RTS
 
@@ -1794,12 +1794,12 @@ ORG &3000
     ; Check Pon
     LDY disc_tile_val
     LDA tile_counts, Y
-    CMP #2    ; compare against 2
-    BCC soc_try_chii    ; if accumulator < #2
+    CMP #2    ; check if enough for a pair
+    BCC soc_try_chii    ; not enough for pon - try chii
     ; Human player: prompt first
     LDX tmp5
-    CPX #0    ; compare against zero
-    BNE soc_pon_ai    ; if accumulator != #0
+    CPX #0    ; check if human player
+    BNE soc_pon_ai    ; AI player - auto-declare pon
     JSR soc_human_prompt_pon
     BCC soc_try_chii          ; N = skip pon, try chii
     JSR execute_pon
@@ -1827,8 +1827,8 @@ ORG &3000
 .soc_do_chii
     ; Human player: prompt first
     LDX tmp5
-    CPX #0    ; compare against zero
-    BNE soc_chii_ai    ; if accumulator != #0
+    CPX #0    ; check if human player
+    BNE soc_chii_ai    ; AI player - auto-declare chii
     JSR soc_human_prompt_chii
     BCC soc_try_kan          ; N = skip chii, try kan
     JSR execute_chii
@@ -1840,12 +1840,12 @@ ORG &3000
 .soc_try_kan
     LDY disc_tile_val
     LDA tile_counts, Y
-    CMP #3    ; compare against 3
-    BCC soc_skip    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC soc_skip    ; not enough for kan
     ; Human player: prompt first
     LDX tmp5
-    CPX #0    ; compare against zero
-    BNE soc_kan_ai    ; if accumulator != #0
+    CPX #0    ; check if human player
+    BNE soc_kan_ai    ; AI player - auto-declare kan
     JSR soc_human_prompt_kan
     BCC soc_skip              ; N = skip kan
     JSR execute_kan
@@ -1858,7 +1858,7 @@ ORG &3000
     LDX tmp5
     INX
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BEQ soc_done    ; if accumulator == #NUM_PLAYERS
+    BEQ soc_done    ; zero - condition met
     JMP soc_lp
 .soc_done
     CLC
@@ -1875,7 +1875,7 @@ ORG &3000
     LDY #0
 .shp_lp
     LDA pon_ask_str, Y
-    BEQ shp_dn    ; branch if zero (equal)
+    BEQ shp_dn    ; end of string
     JSR osnewl: JSR oswrch: INY
     JMP shp_lp
 .shp_dn
@@ -1892,7 +1892,7 @@ ORG &3000
     LDY #0
 .shc_lp
     LDA chii_ask_str, Y
-    BEQ shc_dn    ; branch if zero (equal)
+    BEQ shc_dn    ; end of string
     JSR osnewl: JSR oswrch: INY
     JMP shc_lp
 .shc_dn
@@ -1909,7 +1909,7 @@ ORG &3000
     LDY #0
 .shk_lp
     LDA kan_ask_str, Y
-    BEQ shk_dn    ; branch if zero (equal)
+    BEQ shk_dn    ; end of string
     JSR osnewl: JSR oswrch: INY
     JMP shk_lp
 .shk_dn
@@ -1927,12 +1927,12 @@ ORG &3000
     CLC: ADC #1
     CMP #27: BCS tcl_no
     TAX: LDA tile_counts, X
-    BEQ tcl_no    ; branch if zero (equal)
+    BEQ tcl_no    ; missing required tile - low chii impossible
     LDA disc_tile_val
     CLC: ADC #2
     CMP #27: BCS tcl_no
     TAX: LDA tile_counts, X
-    BEQ tcl_no    ; branch if zero (equal)
+    BEQ tcl_no    ; missing required tile - low chii impossible
     SEC: RTS
 .tcl_no
     CLC: RTS
@@ -1956,11 +1956,11 @@ ORG &3000
 .tcm_check
     TAX: DEX
     LDA tile_counts, X
-    BEQ tcm_no    ; branch if zero (equal)
+    BEQ tcm_no    ; missing required tile - mid chii impossible
     LDA disc_tile_val
     CLC: ADC #1
     TAX: LDA tile_counts, X
-    BEQ tcm_no    ; branch if zero (equal)
+    BEQ tcm_no    ; missing required tile - mid chii impossible
     SEC: RTS
 .tcm_no
     CLC: RTS
@@ -1983,10 +1983,10 @@ ORG &3000
 .tch_check
     TAX: DEX: DEX
     LDA tile_counts, X
-    BEQ tch_no    ; branch if zero (equal)
+    BEQ tch_no    ; missing required tile - high chii impossible
     INX
     LDA tile_counts, X
-    BEQ tch_no    ; branch if zero (equal)
+    BEQ tch_no    ; missing required tile - high chii impossible
     SEC: RTS
 .tch_no
     CLC: RTS
@@ -2003,8 +2003,8 @@ ORG &3000
 .ep_find
     STY tmp4
     LDA tmp4
-    CMP num_tiles, X    ; compare against num_tiles,
-    BCC skp_654    ; if accumulator < num_tiles,
+    CMP num_tiles, X    ; check if past end of hand
+    BCC skp_654    ; still within hand - continue search
     JMP ep_add
 .skp_654
     LDA (ptr), Y
@@ -2095,14 +2095,14 @@ ORG &3000
     CMP disc_tile_val: BNE ek_rm_nxt
     JSR ep_remove_at
     DEC tmp8
-    BNE ek_rm_loop    ; branch if not zero (not equal)
+    BNE ek_rm_loop    ; more tiles to remove for kan
     ; All 3 removed - jump to ep_add (skip bounds check path)
     JMP ep_add
 .ek_rm_nxt
     INY
     STY tmp4
     LDA num_tiles, X
-    CMP tmp4    ; compare against tmp4
+    CMP tmp4    ; check if past end of hand
     BCS ek_rm_find ;\ if num_tiles >= Y, continue scanning
     ; Increment per-player kans count
     LDX current_player
@@ -2121,7 +2121,7 @@ ORG &3000
     ; Add count * 5
     LDX current_player
     LDY opn_count, X
-    BEQ ep_off_done    ; branch if zero (equal)
+    BEQ ep_off_done    ; no existing melds - offset is just base
     LDA #0
 .ep_mul5
     CLC: ADC #5
@@ -2166,7 +2166,7 @@ ORG &3000
     LDY #0
 .gd_title
     LDA title_str, Y
-    BEQ gd_title_dn    ; branch if zero (equal)
+    BEQ gd_title_dn    ; end of string
     JSR oswrch: INY
     JMP gd_title
 .gd_title_dn
@@ -2180,7 +2180,7 @@ ORG &3000
         LDY #0
     .gd_hh
         LDA hand_hdr_str, Y
-        BEQ gd_hh_dn    ; branch if zero (equal)
+        BEQ gd_hh_dn    ; end of string
         JSR oswrch: INY
         JMP gd_hh
     .gd_hh_dn
@@ -2216,7 +2216,7 @@ ORG &3000
 
     ; Practice mode hint
     LDA practice_mode
-    BEQ gd_skip_hint    ; branch if zero (equal)
+    BEQ gd_skip_hint    ; practice mode off - skip hint
     JSR practice_hint
 .gd_skip_hint
 
@@ -2224,7 +2224,7 @@ ORG &3000
     LDY #0
 .gd_mydi
     LDA my_disc_str, Y
-    BEQ gd_mydi_dn    ; branch if zero (equal)
+    BEQ gd_mydi_dn    ; end of string
     JSR oswrch: INY
     JMP gd_mydi
 .gd_mydi_dn
@@ -2238,7 +2238,7 @@ ORG &3000
     LDX #0
     JSR set_disc_ptr
     LDY num_discards, X
-    BEQ gd_mydisc_nl    ; branch if zero (equal)
+    BEQ gd_mydisc_nl    ; no discards yet
     STY tmp6
     LDY #0
 .gd_my_lp
@@ -2259,7 +2259,7 @@ ORG &3000
     LDX #1
 .gd_disc_lp
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BNE gd_disc_body    ; if accumulator != #NUM_PLAYERS
+    BNE gd_disc_body    ; not zero - condition not met
     JMP gd_disc_dn
 .gd_disc_body
     STX tmp7
@@ -2270,7 +2270,7 @@ ORG &3000
     LDY #0
 .gd_cpu_lp
     LDA gd_cpu_str, Y
-    BEQ gd_cpu_dn    ; branch if zero (equal)
+    BEQ gd_cpu_dn    ; end of string
     JSR oswrch: INY
     JMP gd_cpu_lp
 .gd_cpu_dn
@@ -2279,7 +2279,7 @@ ORG &3000
     LDY #0
 .gd_par_lp
     LDA gd_par_str, Y
-    BEQ gd_par_dn    ; branch if zero (equal)
+    BEQ gd_par_dn    ; end of string
     JSR oswrch: INY
     JMP gd_par_lp
 .gd_par_dn
@@ -2288,14 +2288,14 @@ ORG &3000
     LDY #0
 .gd_par2_lp
     LDA gd_par2_str, Y
-    BEQ gd_par2_dn    ; branch if zero (equal)
+    BEQ gd_par2_dn    ; end of string
     JSR oswrch: INY
     JMP gd_par2_lp
 .gd_par2_dn
     JSR set_disc_ptr
     LDX tmp7
     LDY num_discards, X
-    BEQ gd_disc_nl    ; branch if zero (equal)
+    BEQ gd_disc_nl    ; no discards for this player
     STY tmp6
     LDY #0
 .gd_d_lp
@@ -2323,7 +2323,7 @@ ORG &3000
     LDY #0
 .gd_inst
     LDA inst_str, Y
-    BEQ gd_done    ; branch if zero (equal)
+    BEQ gd_done    ; end of instructions string
     JSR oswrch: INY
     JMP gd_inst
 .gd_done
@@ -2332,7 +2332,7 @@ ORG &3000
     LDY #0
 .gd_dora_lp
     LDA gd_dora_str, Y
-    BEQ gd_dora_dn    ; branch if zero (equal)
+    BEQ gd_dora_dn    ; end of string
     JSR oswrch: INY
     JMP gd_dora_lp
 .gd_dora_dn
@@ -2343,7 +2343,7 @@ ORG &3000
     LDY #0
 .gd_wall_lp
     LDA gd_wall_str, Y
-    BEQ gd_wall_dn    ; branch if zero (equal)
+    BEQ gd_wall_dn    ; end of string
     JSR oswrch: INY
     JMP gd_wall_lp
 .gd_wall_dn
@@ -2362,7 +2362,7 @@ ORG &3000
     LDY #0
 .gd_dealer_lp
     LDA gd_dealer_str, Y
-    BEQ gd_dealer_dn    ; branch if zero (equal)
+    BEQ gd_dealer_dn    ; end of string
     JSR oswrch: INY
     JMP gd_dealer_lp
 .gd_dealer_dn
@@ -2394,22 +2394,22 @@ ORG &3000
     JSR print_num16
     ; Print space between players
     LDA tmp5
-    CMP #NUM_PLAYERS-1    ; compare against NUM_PLAYERS-1
-    BEQ dpl_honba    ; if accumulator == #NUM_PLAYERS-1
+    CMP #NUM_PLAYERS-1    ; check if last player in score line
+    BEQ dpl_honba    ; zero - condition met
     ; Show F marker if furiten, R if riichi, space otherwise
     LDY tmp5
     LDA furiten_flags, Y
-    BEQ dpl_no_furi    ; branch if zero (equal)
+    BEQ dpl_no_furi    ; not furiten - check riichi
     LDA #'F': JSR oswrch
     JMP dpl_honba
 .dpl_no_furi
     LDA riichi_declared, Y
-    BEQ dpl_no_riichi    ; branch if zero (equal)
+    BEQ dpl_no_riichi    ; not in riichi - check chombo
     LDA #'R': JSR oswrch
     JMP dpl_honba
 .dpl_no_riichi
     LDA chombo_count, Y
-    BEQ dpl_no_chombo    ; branch if zero (equal)
+    BEQ dpl_no_chombo    ; no chombo - print space
     LDA #'C': JSR oswrch
     JMP dpl_honba
 .dpl_no_chombo
@@ -2418,7 +2418,7 @@ ORG &3000
     LDX tmp5
     INX
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BEQ dpl_done    ; if accumulator == #NUM_PLAYERS
+    BEQ dpl_done    ; zero - condition met
     JMP dpl_lp
 .dpl_done
     ; Print honba and riichi sticks
@@ -2449,7 +2449,7 @@ ORG &3000
     PHA
     LDY tmp4
     DEY
-    BPL pn_outer    ; branch if positive/zero
+    BPL pn_outer    ; more digits to extract
     LDY #0
 .pn_print
     PLA: JSR oswrch
@@ -2465,13 +2465,13 @@ ORG &3000
     ASL tmp3
     ROL tmp2
     ROL A
-    CMP #10    ; compare against 10
-    BCC pd_skip    ; if accumulator < #10
+    CMP #10    ; check if remainder >= 10 for division
+    BCC pd_skip    ; remainder less than 10 - can't subtract
     SBC #10
     INC tmp3
 .pd_skip
     DEY
-    BNE pd_loop    ; branch if not zero (not equal)
+    BNE pd_loop    ; 16 bits not done yet
     RTS
 
 ; =============================================
@@ -2546,20 +2546,20 @@ ORG &3000
 .btc_clear
     STA tile_counts, X
     INX
-    CPX #34    ; compare against 34
-    BNE btc_clear    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE btc_clear    ; more tile types to clear
     ; Count tiles from current player's hand
     LDX current_player
     JSR set_hand_ptr
     LDY num_tiles, X
-    BEQ btc_done    ; branch if zero (equal)
+    BEQ btc_done    ; no tiles to count
     DEY
 .btc_count
     LDA (ptr), Y
     TAX
     INC tile_counts, X
     DEY
-    BPL btc_count    ; branch if positive/zero
+    BPL btc_count    ; more tiles to count
 .btc_done
     RTS
 
@@ -2573,10 +2573,10 @@ ORG &3000
     LDX #0
 .dm_find
     LDA tile_counts, X
-    BNE dm_found    ; branch if not zero (not equal)
+    BNE dm_found    ; found a tile to decompose
     INX
-    CPX #34    ; compare against 34
-    BNE dm_find    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE dm_find    ; more tiles to scan
     ; All counts are zero - all tiles decomposed successfully!
     SEC
     RTS
@@ -2588,8 +2588,8 @@ ORG &3000
     LDA tile_counts, X
 
     ; Try triplet (count >= 3)
-    CMP #3    ; compare against 3
-    BCC dm_try_seq    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC dm_try_seq    ; not enough for triplet - try sequence
 
     ; Remove triplet
     SEC: SBC #3
@@ -2611,13 +2611,13 @@ ORG &3000
     ; Try sequence (only suited tiles 0-26)
     PLA: TAX            ; restore tile index
     PHA                 ; save again for potential backtrack
-    CPX #27    ; compare against 27
-    BCS dm_fail    ; if accumulator >= #27
+    CPX #27    ; check if tile is an honor
+    BCS dm_fail    ; honor tile - can't form sequence
     ; Check tiles X+1 and X+2 exist
     LDA tile_counts+1, X
-    BEQ dm_fail    ; branch if zero (equal)
+    BEQ dm_fail    ; missing tile for sequence - not possible
     LDA tile_counts+2, X
-    BEQ dm_fail    ; branch if zero (equal)
+    BEQ dm_fail    ; missing tile for sequence - not possible
     ; Remove sequence
     DEC tile_counts, X
     DEC tile_counts+1, X
@@ -2655,8 +2655,8 @@ ORG &3000
     LDX #0
 .cw_try_pair
     LDA tile_counts, X
-    CMP #2    ; compare against 2
-    BCC cw_next_pair    ; if accumulator < #2
+    CMP #2    ; check if enough for a pair
+    BCC cw_next_pair    ; not enough for a pair - try next
 
     ; Remove pair from counts
     SEC: SBC #2
@@ -2679,8 +2679,8 @@ ORG &3000
 
 .cw_next_pair
     INX
-    CPX #34    ; compare against 34
-    BNE cw_try_pair    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE cw_try_pair    ; more tiles to try as pair
 
     ; Standard win failed - check seven pairs
     JSR check_seven_pairs
@@ -2703,17 +2703,17 @@ ORG &3000
     LDY #0          ; pair counter
 .csp_loop
     LDA tile_counts, X
-    BEQ csp_next    ; branch if zero (equal)
-    CMP #2    ; compare against 2
+    BEQ csp_next    ; no tiles here - not a pair
+    CMP #2    ; check if count is exactly 2
     BNE csp_fail    ; count must be exactly 0 or 2
     INY             ; found a pair
 .csp_next
     INX
-    CPX #34    ; compare against 34
-    BNE csp_loop    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE csp_loop    ; more tiles to check
     ; Must have exactly 7 pairs
-    CPY #7    ; compare against 7
-    BNE csp_fail    ; if accumulator != #7
+    CPY #7    ; check if exactly 7 pairs found
+    BNE csp_fail    ; not 7 pairs - not seven pairs hand
     SEC
     RTS
 .csp_fail
@@ -2731,26 +2731,26 @@ ORG &3000
 .cto_clear
     STA tile_counts, X
     INX
-    CPX #34    ; compare against 34
-    BNE cto_clear    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE cto_clear    ; not zero - condition not met
     ; Count tiles from current player's hand
     LDX current_player
     JSR set_hand_ptr
     LDY num_tiles, X
-    BEQ cto_fail    ; branch if zero (equal)
+    BEQ cto_fail    ; no tiles - can't be thirteen orphans
     DEY
 .cto_count
     LDA (ptr), Y
     TAX
     INC tile_counts, X
     DEY
-    BPL cto_count    ; branch if positive/zero
+    BPL cto_count    ; more tiles to count
 
     ; Must have exactly 14 tiles
     LDX current_player
     LDA num_tiles, X
-    CMP #HAND_SIZE    ; compare against HAND_SIZE
-    BNE cto_fail    ; if accumulator != #HAND_SIZE
+    CMP #HAND_SIZE    ; thirteen orphans requires exactly 14 tiles
+    BNE cto_fail    ; wrong count - not kokushi
 
     ; Check all 13 terminal/honor tiles exist at least once
     LDY #0          ; pair found flag
@@ -2758,20 +2758,20 @@ ORG &3000
 .cto_check
     LDA tile_counts, X
     BEQ cto_fail    ; missing a required tile
-    CMP #1    ; compare against 1
-    BEQ cto_next    ; if accumulator == #1
-    CMP #2    ; compare against 2
+    CMP #1    ; check if exactly 1 copy (acceptable)
+    BEQ cto_next    ; exactly 1 - acceptable
+    CMP #2    ; check if enough for a pair
     BNE cto_fail    ; count > 2 not allowed
     INY             ; found pair
-    CPY #2    ; compare against 2
+    CPY #2    ; check if pair count is 2
     BCS cto_fail    ; more than one pair
 .cto_next
     INX
-    CPX #34    ; compare against 34
-    BNE cto_check    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE cto_check    ; more tiles to check
     ; Must have exactly one pair (Y = 1)
-    CPY #1    ; compare against 1
-    BNE cto_fail    ; if accumulator != #1
+    CPY #1    ; check if exactly 1 pair found
+    BNE cto_fail    ; wrong tile count - not kokushi
     SEC
     RTS
 .cto_fail
@@ -2792,9 +2792,9 @@ ORG &3000
     ; Determine if hand is closed
     LDX current_player
     LDA opn_count, X
-    CMP #1    ; compare against 1
+    CMP #1    ; check if exactly 1
     LDA #0
-    BCS cs_set_open    ; branch if carry set (>= or true)
+    BCS cs_set_open    ; hand is open
     LDA #1
 .cs_set_open
     STA hand_closed
@@ -2845,7 +2845,7 @@ ORG &3000
     LDA riichi_on_table, X
     AND #1: BEQ cs_no_ipp
     LDA ippatsu_flags, X
-    BEQ cs_no_ipp    ; branch if zero (equal)
+    BEQ cs_no_ipp    ; not in riichi - no ippatsu
     INC han_count
     LDA yaku_flags2: ORA #&01: STA yaku_flags2
 .cs_no_ipp
@@ -2882,7 +2882,7 @@ ORG &3000
     JSR check_chanta
     BCC cs_no_cha    ; if check_chanta returned carry clear (OK/false)
     LDA hand_closed
-    BEQ cs_cha_open    ; branch if zero (equal)
+    BEQ cs_cha_open    ; hand is open - only 1 han for chanta
     LDA han_count: CLC: ADC #2: STA han_count
     JMP cs_cha_set
 .cs_cha_open
@@ -3034,7 +3034,7 @@ ORG &3000
     ; Must have no open melds
     LDX current_player
     LDA opn_count, X
-    BNE suuank_no    ; branch if not zero (not equal)
+    BNE suuank_no    ; open hand - can't be four concealed triplets
     ; Build tile counts from hand
     JSR build_tile_counts
     ; Try to decompose into all triplets
@@ -3054,18 +3054,18 @@ ORG &3000
     LDX #0
     STX tmp9
 .suank_dm_scan
-    CPX #34    ; compare against 34
-    BEQ suank_dm_check    ; if accumulator == #34
+    CPX #34    ; check if all tile types scanned
+    BEQ suank_dm_check    ; all tiles scanned - verify result
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC suank_dm_next    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC suank_dm_next    ; not enough for triplet - skip
     ; Found a triplet - remove it
     SEC: SBC #3
     STA tile_counts, X
     INC tmp9
     LDA tmp9
-    CMP #4    ; compare against 4
-    BEQ suank_dm_check    ; if accumulator == #4
+    CMP #4    ; check if count is 4
+    BEQ suank_dm_check    ; all tiles scanned - verify result
     JMP suank_dm_scan
 .suank_dm_next
     INX
@@ -3076,8 +3076,8 @@ ORG &3000
 .suank_dm_sum
     CLC: ADC tile_counts, X
     INX: CPX #34: BNE suank_dm_sum
-    CMP #2    ; compare against 2
-    BEQ suank_dm_yes    ; if accumulator == #2
+    CMP #2    ; check if exactly 2 tiles remain (pair)
+    BEQ suank_dm_yes    ; exactly a pair remaining - success
     CLC: RTS
 .suank_dm_yes
     SEC: RTS
@@ -3114,8 +3114,8 @@ ORG &3000
     CLC: ADC tile_counts, Y
     INY
     INX: CPX #9: BNE cp_sum
-    CMP #14    ; compare against 14
-    BNE cp_fail    ; if accumulator != #14
+    CMP #14    ; check if suit has exactly 14 tiles
+    BNE cp_fail    ; wrong tile count for nine gates
     ; Check each tile count matches 9-gates pattern
     ; Pattern: 3,1,1,1,1,1,1,1,3 (+ one extra somewhere)
     LDY tmp9
@@ -3142,17 +3142,17 @@ ORG &3000
     INY: INX: CPX #9: BNE cp_pat
     ; Exactly one tile position must have the extra tile
     LDA tmp8
-    CMP #1    ; compare against 1
-    BNE cp_fail    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE cp_fail    ; wrong tile count for nine gates
     SEC: RTS
 .cp_fail
     CLC: RTS
 
     ; If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
-    BNE cs_is_yakuman    ; branch if not zero (not equal)
+    BNE cs_is_yakuman    ; yakuman detected - set han to 13
     LDA yakuman_flags2
-    BEQ cs_no_yakuman    ; branch if zero (equal)
+    BEQ cs_no_yakuman    ; no yakuman - proceed to fu calculation
 .cs_is_yakuman
     LDA #13: STA han_count
     JMP compute_points
@@ -3171,7 +3171,7 @@ ORG &3000
     LDX #0
 .ct_loop
     LDA tile_counts, X
-    BEQ ct_next    ; branch if zero (equal)
+    BEQ ct_next    ; no tiles of this type - OK for tanyao
     CPX #0: BEQ ct_fail
     CPX #8: BEQ ct_fail
     CPX #9: BEQ ct_fail
@@ -3200,7 +3200,7 @@ ORG &3000
     ; Check open melds
     LDX current_player
     LDA opn_count, X
-    BEQ cy_done    ; branch if zero (equal)
+    BEQ cy_done    ; no open melds to check
     STA tmp8
     TXA: ASL A: ASL A: STA tmp9
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -3243,7 +3243,7 @@ ORG &3000
 .check_toitoi
     LDX current_player
     LDA opn_count, X
-    BEQ ctt_check    ; branch if zero (equal)
+    BEQ ctt_check    ; no open melds - check hand for triplets
 
     TXA: ASL A: ASL A: STA tmp
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -3272,7 +3272,7 @@ ORG &3000
     LDA #1: STA no_seq_flag
     JSR decompose_melds
     LDA #0: STA no_seq_flag
-    BCS ctt_found    ; branch if carry set (>= or true)
+    BCS ctt_found    ; carry set
     PLA: TAX: PHA
     LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
     PLA: TAX
@@ -3304,7 +3304,7 @@ ORG &3000
     LDY #0
 .csh_lp
     LDA tile_counts, X
-    BNE csh_yes    ; branch if not zero (not equal)
+    BNE csh_yes    ; this suit is present in the hand
     INX: INY: CPY #9: BNE csh_lp
     CLC: RTS
 .csh_yes
@@ -3317,7 +3317,7 @@ ORG &3000
     LDX #27: LDA #0
 .ch_hon
     ORA tile_counts, X: INX: CPX #34: BNE ch_hon
-    BEQ ch_no    ; branch if zero (equal)
+    BEQ ch_no    ; no honor tiles - not honitsu
     SEC: RTS
 .ch_no
     CLC: RTS
@@ -3329,7 +3329,7 @@ ORG &3000
     LDX #27: LDA #0
 .cc_hon
     ORA tile_counts, X: INX: CPX #34: BNE cc_hon
-    BNE cc_no    ; branch if not zero (not equal)
+    BNE cc_no    ; honor tiles present - not chinitsu
     SEC: RTS
 .cc_no
     CLC: RTS
@@ -3496,7 +3496,7 @@ ORG &3000
 .crsp_loop
     CPX #34: BCS crsp_done
     LDA tile_counts, X
-    BEQ crsp_next    ; branch if zero (equal)
+    BEQ crsp_next    ; no tiles here - not the pair
     CMP #2: BNE crsp_fail
     INY
 .crsp_next
@@ -3517,11 +3517,11 @@ ORG &3000
 .cs_outer
     CPY #9: BCS cs_no
     LDA tile_counts, Y
-    BEQ cs_next    ; branch if zero (equal)
+    BEQ cs_next    ; no tiles at this sequence position
     INY: LDA tile_counts, Y
-    BEQ cs_next2    ; branch if zero (equal)
+    BEQ cs_next2    ; no tiles at this sequence position
     INY: LDA tile_counts, Y
-    BEQ cs_next3    ; branch if zero (equal)
+    BEQ cs_next3    ; no tiles at this sequence position
     ; Found sequence in man (Y-2, Y-1, Y)
     ; Check pin (Y+7, Y+8, Y+9)
     TYA: CLC: ADC #7: TAX
@@ -3595,7 +3595,7 @@ ORG &3000
 .ct_mcheck
     CPY #34: BCS ct_mcheck_done
     LDA tile_counts, Y
-    BEQ ct_mcheck_next    ; branch if zero (equal)
+    BEQ ct_mcheck_next    ; no tiles here - skip
     JSR is_terminal_or_honor
     BCC ct_mcheck_fail    ; if is_terminal_or_honor returned carry clear (OK/false)
 .ct_mcheck_next
@@ -3723,9 +3723,9 @@ ORG &3000
     LDX #0
 .chr_loop
     LDA tile_counts, X
-    BEQ chr_next    ; branch if zero (equal)
+    BEQ chr_next    ; no tiles of this type - OK
     TXA: JSR is_terminal_or_honor_a
-    BCC chr_fail    ; branch if carry clear (< or false)
+    BCC chr_fail    ; tile is not terminal/honor - fail
 .chr_next
     INX: CPX #34: BNE chr_loop
     SEC: RTS
@@ -3777,8 +3777,8 @@ ORG &3000
 .check_suukantsu
     LDX current_player
     LDA player_kans, X
-    CMP #4    ; compare against 4
-    BCS csu_yes    ; if accumulator >= #4
+    CMP #4    ; check if count is 4
+    BCS csu_yes    ; 4 or more kans - suukantsu!
     CLC
     RTS
 .csu_yes
@@ -3793,7 +3793,7 @@ ORG &3000
     ; Add open meld dragon tiles to counts
     LDX current_player
     LDA opn_count, X
-    BEQ cd_check_hand    ; branch if zero (equal)
+    BEQ cd_check_hand    ; no open melds - check hand only
     STA tmp8
     TXA: ASL A: ASL A: STA tmp9
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -3819,16 +3819,16 @@ ORG &3000
     ; Check all three dragons have count >= 3
     LDX #31
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cd_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cd_no    ; triplet missing
     LDX #32
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cd_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cd_no    ; triplet missing
     LDX #33
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cd_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cd_no    ; triplet missing
     SEC
     RTS
 .cd_no
@@ -3843,7 +3843,7 @@ ORG &3000
     LDX #0
 .ccr_loop
     LDA tile_counts, X
-    BEQ ccr_next    ; branch if zero (equal)
+    BEQ ccr_next    ; no tiles of this type - OK
     ; Check if tile is a terminal (0, 8, 9, 17, 18, 26)
     CPX #0: BEQ ccr_next
     CPX #8: BEQ ccr_next
@@ -3856,8 +3856,8 @@ ORG &3000
     RTS
 .ccr_next
     INX
-    CPX #34    ; compare against 34
-    BNE ccr_loop    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE ccr_loop    ; more tile types to check
     SEC
     RTS
 
@@ -3869,17 +3869,17 @@ ORG &3000
     LDX #0
 .ctu_loop
     LDA tile_counts, X
-    BEQ ctu_next    ; branch if zero (equal)
+    BEQ ctu_next    ; no tiles here - OK for all honors
     ; Check if tile is an honor (27-33)
-    CPX #27    ; compare against 27
-    BCS ctu_next    ; if accumulator >= #27
+    CPX #27    ; check if tile is an honor
+    BCS ctu_next    ; it's an honor tile - OK
     ; Not an honor - fail
     CLC
     RTS
 .ctu_next
     INX
-    CPX #34    ; compare against 34
-    BNE ctu_loop    ; if accumulator != #34
+    CPX #34    ; check if all tile types scanned
+    BNE ctu_loop    ; more tiles to check
     SEC
     RTS
 
@@ -3891,7 +3891,7 @@ ORG &3000
     ; Add open meld wind tiles to counts
     LDX current_player
     LDA opn_count, X
-    BEQ cds_check_hand    ; branch if zero (equal)
+    BEQ cds_check_hand    ; no open melds - check hand only
     STA tmp8
     TXA: ASL A: ASL A: STA tmp9
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -3917,20 +3917,20 @@ ORG &3000
     ; Check all four winds have count >= 3
     LDX #27
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cds_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cds_no    ; triplet missing
     LDX #28
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cds_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cds_no    ; triplet missing
     LDX #29
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cds_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cds_no    ; triplet missing
     LDX #30
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cds_no    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cds_no    ; triplet missing
     SEC
     RTS
 .cds_no
@@ -3945,7 +3945,7 @@ ORG &3000
     ; Add open meld wind tiles to counts
     LDX current_player
     LDA opn_count, X
-    BEQ csss_check_hand    ; branch if zero (equal)
+    BEQ csss_check_hand    ; no open melds - check hand only
     STA tmp8
     TXA: ASL A: ASL A: STA tmp9
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -3975,27 +3975,27 @@ ORG &3000
     LDX #27
 .csss_count_lp
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC csss_not_triplet    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC csss_not_triplet    ; not a triplet
     ; Count as triplet
     INC tmp8
     JMP csss_next_tile
 .csss_not_triplet
-    CMP #2    ; compare against 2
-    BCC csss_next_tile    ; if accumulator < #2
+    CMP #2    ; check if count >= 2 (pair)
+    BCC csss_next_tile    ; not a pair either - skip
     ; Count as pair
     INC tmp9
 .csss_next_tile
     INX
-    CPX #31    ; compare against 31
-    BNE csss_count_lp    ; if accumulator != #31
+    CPX #31    ; check if all 4 wind tiles checked
+    BNE csss_count_lp    ; more wind tiles to check
     ; Need exactly 3 triplets and 1 pair
     LDA tmp8
-    CMP #3    ; compare against 3
-    BNE csss_no    ; if accumulator != #3
+    CMP #3    ; need 3+ copies for triplet
+    BNE csss_no    ; wrong triplet or pair count
     LDA tmp9
-    CMP #1    ; compare against 1
-    BNE csss_no    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE csss_no    ; wrong triplet or pair count
     SEC
     RTS
 .csss_no
@@ -4024,7 +4024,7 @@ ORG &3000
 .cf_melds
     LDX current_player
     LDA opn_count, X
-    BEQ cf_closed    ; branch if zero (equal)
+    BEQ cf_closed    ; hand is closed - use closed meld fu values
 
     TXA: ASL A: ASL A: STA tmp
     TXA: ASL A: ASL A: ASL A: ASL A
@@ -4118,7 +4118,7 @@ ORG &3000
 .cp_lim
     LDA score_hi
     CMP #>(2000): BCC cp_chk_han
-    BNE cp_limit_chk    ; if accumulator != #>(2000):
+    BNE cp_limit_chk    ; score exceeds 2000 base
     LDA score_lo: CMP #<(2000): BCC cp_chk_han
 
 .cp_limit_chk
@@ -4390,9 +4390,9 @@ ORG &3000
 
     ; Check if this is a yakuman hand
     LDA yakuman_flags
-    BNE dsr_is_yakuman    ; branch if not zero (not equal)
+    BNE dsr_is_yakuman    ; yakuman hand detected
     LDA yakuman_flags2
-    BEQ dsr_norm    ; branch if zero (equal)
+    BEQ dsr_norm    ; no yakuman - show normal han/fu
 .dsr_is_yakuman
     JMP dsr_normal_han
 .dsr_norm
@@ -4564,7 +4564,7 @@ ORG &3000
     DEY: BNE at_d3
     CMP #0: BEQ at_nornd
     LDA tmp3: CLC: ADC #100: STA tmp3
-    BCC at_nornd    ; if carry was clear
+    BCC at_nornd    ; no remainder - no rounding needed
     INC tmp2
 .at_nornd
     LDA honba: BEQ at_hb_done
@@ -4573,7 +4573,7 @@ ORG &3000
 .at_hb
     CLC: ADC #100: DEC tmp4: BNE at_hb
     CLC: ADC tmp3: STA tmp3
-    BCC at_hb_done    ; if carry was clear
+    BCC at_hb_done    ; honba bonus complete
     INC tmp2
 .at_hb_done
     LDX tmp5
@@ -4609,7 +4609,7 @@ ORG &3000
     CLC: ADC #100: DEC tmp4: BNE ar_hb
     ASL A: ASL A  ; *4 = *300 approx (close enough for now)
     CLC: ADC tmp3: STA tmp3
-    BCC ar_hb_done    ; if carry was clear
+    BCC ar_hb_done    ; honba bonus complete
     INC tmp2
 .ar_hb_done
 
@@ -4684,7 +4684,7 @@ ORG &3000
 
 .disp_open_melds
     LDA opn_count, X
-    BEQ dom_done    ; branch if zero (equal)
+    BEQ dom_done    ; no open melds - nothing to display
 
     ; Save player number
     TXA: PHA
@@ -4743,7 +4743,7 @@ ORG &3000
     ; Next meld
     LDY tmp5
     CPY #0    ; compare against zero
-    BNE dom_loop    ; if accumulator != #0
+    BNE dom_loop    ; more melds to display
 
 .dom_done
     RTS
@@ -4760,17 +4760,17 @@ ORG &3000
 .check_four_winds
     ; Only check after 4 players have each discarded once
     LDA num_discards
-    CMP #1    ; compare against 1
-    BNE cfw_no    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE cfw_no    ; player not ready - can't be four winds
     LDA num_discards+1
-    CMP #1    ; compare against 1
-    BNE cfw_no    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE cfw_no    ; player not ready - can't be four winds
     LDA num_discards+2
-    CMP #1    ; compare against 1
-    BNE cfw_no    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE cfw_no    ; player not ready - can't be four winds
     LDA num_discards+3
-    CMP #1    ; compare against 1
-    BNE cfw_no    ; if accumulator != #1
+    CMP #1    ; check if exactly 1
+    BNE cfw_no    ; player not ready - can't be four winds
     ; All players have 1 discard - check if all are winds
     ; Read each player's first discard from their discard pile
     LDX #0
@@ -4798,7 +4798,7 @@ ORG &3000
     LDY #0
 .cfw_msg_lp
     LDA abortive_four_winds_str, Y
-    BEQ cfw_msg_dn    ; branch if zero (equal)
+    BEQ cfw_msg_dn    ; end of string
     JSR oswrch: INY
     JMP cfw_msg_lp
 .cfw_msg_dn
@@ -4813,13 +4813,13 @@ ORG &3000
 ; When 4 kans have been declared total by all players
 .check_four_kans
     LDA four_kans_count
-    CMP #4    ; compare against 4
-    BCC cfk_no    ; if accumulator < #4
+    CMP #4    ; check if count is 4
+    BCC cfk_no    ; fewer than 4 kans - no abortive draw
     JSR game_display
     LDY #0
 .cfk_msg_lp
     LDA abortive_four_kans_str, Y
-    BEQ cfk_msg_dn    ; branch if zero (equal)
+    BEQ cfk_msg_dn    ; end of string
     JSR oswrch: INY
     JMP cfk_msg_lp
 .cfk_msg_dn
@@ -4868,7 +4868,7 @@ ORG &3000
     LDY #0
 .ctr_msg_lp
     LDA abortive_triple_ron_str, Y
-    BEQ ctr_msg_dn    ; branch if zero (equal)
+    BEQ ctr_msg_dn    ; end of string
     JSR oswrch: INY
     JMP ctr_msg_lp
 .ctr_msg_dn
@@ -4887,11 +4887,11 @@ ORG &3000
 .check_nine_gates
     LDX current_player
     LDA num_tiles, X
-    CMP #14    ; compare against 14
-    BNE cng_no    ; if accumulator != #14
+    CMP #14    ; check if suit has exactly 14 tiles
+    BNE cng_no    ; not zero - condition not met
     ; Check if hand is closed (no open melds)
     LDA opn_count, X
-    BNE cng_no    ; branch if not zero (not equal)
+    BNE cng_no    ; not zero - condition not met
     ; Build tile counts
     JSR build_tile_counts
     ; Check each suit: Man(0-8), Pin(9-17), Sou(18-26)
@@ -4902,8 +4902,8 @@ ORG &3000
     BCS cng_found    ; if cng_check_suit returned carry set (error/true)
     LDX tmp5
     INX
-    CPX #3    ; compare against 3
-    BNE cng_suit_lp    ; if accumulator != #3
+    CPX #3    ; check if all 3 suits tested
+    BNE cng_suit_lp    ; more suits to test
     CLC
     RTS
 .cng_found
@@ -4925,27 +4925,27 @@ ORG &3000
     STY tmp6
     ; Check tile X+0 (1) has at least 3
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cng_no_match    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cng_no_match    ; not enough copies for nine gates
     CLC: ADC tmp6: STA tmp6
     ; Check tiles X+1 through X+8 have at least 1 each
     INX
 .cng_mid_lp
     LDA tile_counts, X
-    BEQ cng_no_match    ; branch if zero (equal)
+    BEQ cng_no_match    ; pattern doesn't match - not nine gates
     CLC: ADC tmp6: STA tmp6
     INX
-    CPX #9    ; compare against 9
-    BCC cng_mid_lp    ; if accumulator < #9
+    CPX #9    ; check if all middle tiles checked
+    BCC cng_mid_lp    ; more middle tiles to check
     ; Now X is at X+9 (the 9 tile)
     LDA tile_counts, X
-    CMP #3    ; compare against 3
-    BCC cng_no_match    ; if accumulator < #3
+    CMP #3    ; need 3+ copies for triplet
+    BCC cng_no_match    ; not enough copies for nine gates
     CLC: ADC tmp6: STA tmp6
     ; Total should be 14
     LDA tmp6
-    CMP #14    ; compare against 14
-    BNE cng_no_match    ; if accumulator != #14
+    CMP #14    ; check if suit has exactly 14 tiles
+    BNE cng_no_match    ; not zero - condition not met
     SEC
     RTS
 .cng_no_match
@@ -4963,8 +4963,8 @@ ORG &3000
     ; Now handle the draw resolution
     INC honba: INC hands_played
     LDA hands_played
-    CMP #8    ; compare against 8
-    BCC dad_new    ; if accumulator < #8
+    CMP #8    ; check if max hands reached
+    BCC dad_new    ; under max - start new round
     SEC: RTS
 .dad_new
     JSR new_round
@@ -4975,7 +4975,7 @@ ORG &3000
     LDY #0
 .dng_lp
     LDA abortive_nine_gates_str, Y
-    BEQ dng_dn    ; branch if zero (equal)
+    BEQ dng_dn    ; end of string
     JSR oswrch: INY
     JMP dng_lp
 .dng_dn
