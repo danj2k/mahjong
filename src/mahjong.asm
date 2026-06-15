@@ -4794,6 +4794,8 @@ ORG &3000
 .nr_kans
     STA player_kans, X
     INX: CPX #NUM_PLAYERS: BNE nr_kans
+    ; Reset total kans counter
+    STA four_kans_count
     ; Reset open meld count (clear between rounds)
     LDX #0
 .nr_opn
