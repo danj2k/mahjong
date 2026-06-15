@@ -2558,10 +2558,12 @@ ORG &3000
     RTS
 
 .dm_found
-    \ Save tile index on stack for backtracking
+    \\ Save tile index on stack for backtracking
     TXA: PHA
+    \\ Reload count (TXA clobbered A which had the count from dm_find)
+    LDA tile_counts, X
 
-    \ Try triplet (count >= 3)
+    \\ Try triplet (count >= 3)
     CMP #3
     BCC dm_try_seq
 
