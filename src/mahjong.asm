@@ -1115,18 +1115,21 @@ ORG &3000
     JMP cck_rm_done
 .cck_rm_done
 
-    ; Draw replacement from dead wall
+    ; Draw replacement from dead wall (rinshan draw)
     LDA dora_count
     CLC: ADC #DORA_START
     TAX
-    LDA wall, X          ;\ draw from end of dead wall
+    LDA wall, X          ; draw from end of dead wall
     PHA
     LDX current_player
     JSR set_hand_ptr
     PLA
     LDY num_tiles, X
+    CPY #HAND_SIZE
+    BCS cck_no_draw      ; hand full, skip draw (safety)
     STA (ptr), Y
     INC num_tiles, X
+.cck_no_draw
 
     ; Reveal new dora indicator
     JSR reveal_dora
@@ -1280,7 +1283,7 @@ ORG &3000
     CLC: RTS
 
 .eak_draw
-    ; Draw replacement from dead wall
+    ; Draw replacement from dead wall (rinshan draw)
     LDA dora_count
     CLC: ADC #DORA_START
     TAX
@@ -1290,8 +1293,11 @@ ORG &3000
     JSR set_hand_ptr
     PLA
     LDY num_tiles, X
+    CPY #HAND_SIZE
+    BCS eak_no_draw      ; hand full, skip draw (safety)
     STA (ptr), Y
     INC num_tiles, X
+.eak_no_draw
 
     ; Reveal new dora indicator
     JSR reveal_dora
@@ -2044,6 +2050,54 @@ ORG &3000
     DEC num_tiles, X
     RTS
 
+; ep_add: record an open meld after pon or chii.
+; Records type 1 (pon) with disc_tile_val x 3.
+; Used by execute_pon after removing 2 tiles from hand.
+.ep_add
+    ; Calculate offset into opn_melds
+    ; offset = player * 20 + opn_count * 5
+    LDX current_player
+    TXA: ASL A: ASL A       ; * 4
+    STA tmp4
+    TXA: ASL A: ASL A: ASL A: ASL A ; * 16
+    CLC: ADC tmp4            ; = * 20
+    STA tmp4                 ; tmp4 = player * 20
+    ; Add opn_count * 5
+    LDX current_player
+    LDY opn_count, X
+    BEQ ep_off_done    ; no existing melds - offset is just base
+    LDA #0
+.ep_mul5
+    CLC: ADC #5
+    DEY: BNE ep_mul5
+    JMP ep_off_add
+.ep_off_done
+    LDA #0
+.ep_off_add
+    CLC: ADC tmp4            ; + player * 20
+    TAX                      ; X = offset into opn_melds
+    ; Store meld: type 1 (pon), disc_tile_val x 3
+    LDA #1
+    STA opn_melds, X
+    INX
+    LDA disc_tile_val
+    STA opn_melds, X
+    STA opn_melds+1, X
+    STA opn_melds+2, X
+    ; Increment meld count
+    LDX current_player
+    INC opn_count, X
+    ; Remove last entry from discard pile (use discarder, not caller)
+    LDX disc_tile_player
+    JSR set_disc_ptr
+    LDA num_discards, X
+    SEC: SBC #1
+    STA num_discards, X
+    ; Set skip_draw
+    LDA #1
+    STA skip_draw
+    RTS
+
 ; Execute Chii: claim discarded tile with 2 from hand (sequence).
 .execute_chii
     LDX tmp5
@@ -2079,12 +2133,12 @@ ORG &3000
 .ec_n2
     INY: JMP ec_find2
 
-; Execute Kan: claim discarded tile with 3 from hand.
+; Execute Kan: claim discarded tile with 3 from hand (open kan / daiminkan).
+; Records as type 4 meld, draws rinshan replacement from dead wall.
 .execute_kan
     LDX tmp5
     STX current_player
-    JSR set_hand_ptr
-    ; Remove 3 copies of disc_tile_val
+    ; Remove 3 copies of disc_tile_val from hand
     LDA #3: STA tmp8          ; need to remove 3
 .ek_rm_loop
     LDX current_player
@@ -2096,61 +2150,79 @@ ORG &3000
     JSR ep_remove_at
     DEC tmp8
     BNE ek_rm_loop    ; more tiles to remove for kan
-    ; All 3 removed - jump to ep_add (skip bounds check path)
-    JMP ep_add
+    JMP ek_rm_done
 .ek_rm_nxt
     INY
     STY tmp4
     LDA num_tiles, X
     CMP tmp4    ; check if past end of hand
-    BCS ek_rm_find ;\ if num_tiles >= Y, continue scanning
-    ; Increment per-player kans count
-    LDX current_player
-    INC player_kans, X
-    INC four_kans_count
-    JMP ep_add     ;\ past end of hand
-.ep_add
-    ; Calculate offset into opn_melds
-    ; offset = player * 20 + count * 5
+    BCS ek_rm_find    ; still within hand, keep scanning
+.ek_rm_done
+
+    ; Record meld as type 4 (kan) with 4 tiles
+    ; offset = player * 20 + opn_count * 5
     LDX current_player
     TXA: ASL A: ASL A       ; * 4
     STA tmp4
     TXA: ASL A: ASL A: ASL A: ASL A ; * 16
     CLC: ADC tmp4            ; = * 20
     STA tmp4                 ; tmp4 = player * 20
-    ; Add count * 5
+    ; Add opn_count * 5
     LDX current_player
     LDY opn_count, X
-    BEQ ep_off_done    ; no existing melds - offset is just base
+    BEQ ek_off_done    ; no existing melds - offset is just base
     LDA #0
-.ep_mul5
+.ek_mul5
     CLC: ADC #5
-    DEY: BNE ep_mul5
-    JMP ep_off_add
-.ep_off_done
+    DEY: BNE ek_mul5
+    JMP ek_off_add
+.ek_off_done
     LDA #0
-.ep_off_add
+.ek_off_add
     CLC: ADC tmp4            ; + player * 20
     TAX                      ; X = offset into opn_melds
-    ; Determine meld type from caller
-    ; For now, all calls are pon (type 1)
-    LDA #1
+    ; Store meld: type 4 (kan), tile x 4
+    LDA #4
     STA opn_melds, X
     INX
     LDA disc_tile_val
     STA opn_melds, X
     STA opn_melds+1, X
     STA opn_melds+2, X
+    STA opn_melds+3, X
     ; Increment meld count
     LDX current_player
     INC opn_count, X
+
+    ; Rinshan draw: replacement from dead wall
+    LDA dora_count
+    CLC: ADC #DORA_START
+    TAX
+    LDA wall, X          ; draw from end of dead wall
+    PHA
+    LDX current_player
+    JSR set_hand_ptr
+    PLA
+    LDY num_tiles, X
+    CPY #HAND_SIZE
+    BCS ek_no_draw       ; hand full, skip draw (safety)
+    STA (ptr), Y
+    INC num_tiles, X
+.ek_no_draw
+
+    ; Reveal new dora indicator
+    JSR reveal_dora
+    ; Increment per-player kans count
+    LDX current_player
+    INC player_kans, X
+    INC four_kans_count
     ; Remove last entry from discard pile (use discarder, not caller)
     LDX disc_tile_player
     JSR set_disc_ptr
     LDA num_discards, X
     SEC: SBC #1
     STA num_discards, X
-    ; Set skip_draw
+    ; Set skip_draw (player will discard after rinshan)
     LDA #1
     STA skip_draw
     RTS
@@ -4740,10 +4812,10 @@ ORG &3000
     ; Space between melds
     LDA #' ': JSR oswrch
 
-    ; Next meld
+    ; Next meld - step down to previous index, stop after index 0
     LDY tmp5
-    CPY #0    ; compare against zero
-    BNE dom_loop    ; more melds to display
+    DEY
+    BPL dom_loop    ; index still >= 0, more melds to display
 
 .dom_done
     RTS
