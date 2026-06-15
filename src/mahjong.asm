@@ -68,7 +68,7 @@ disc_tile_val = &8F
 disc_tile_player = &90
 
 ; Flag set when human declines closed kan prompt
-kan_declined = &91
+; kan_declined is in the data section (after player_kans)
 
 
 ; Meld decomposition result storage
@@ -1113,32 +1113,35 @@ ORG &3000
     LDX current_player
     INC opn_count, X
 
-    ; Remove 4 copies of tmp5 from hand
-    LDA #4: STA tmp8
+    ; Remove 4 copies of the kan tile from hand
+    ; Note: set_hand_ptr clobbers tmp5, so save tile value in tmp6
+    LDA tmp5: STA tmp6   ;\\ tmp6 = tile value (survives set_hand_ptr)
+    LDA #4: STA tmp8     ;\\ tmp8 = tiles remaining to remove
 .cck_rm_lp
     LDX current_player
-    JSR set_hand_ptr
+    JSR set_hand_ptr     ;\\ ptr = hand base (clobbers tmp5)
     LDY #0
 .cck_rm_find
     LDA (ptr), Y
-    CMP tmp5: BNE cck_rm_nxt
-    JSR ep_remove_at
+    CMP tmp6: BNE cck_rm_nxt
+    JSR ep_remove_at     ;\\ remove tile at Y, shift hand left, DEC num_tiles
     DEC tmp8
-    BNE cck_rm_lp    ; more tiles to remove
+    BNE cck_rm_lp        ;\\ more tiles to remove
     JMP cck_rm_done
 .cck_rm_nxt
     INY
-    ; Bounds check
+    ; Bounds check: if Y >= num_tiles, scan is complete
     STY tmp4
     LDX current_player
     LDA num_tiles, X
-    CMP tmp4    ; check if past end of hand
-    BCS cck_rm_find    ; still within hand - keep searching
+    CMP tmp4    ;\\ num_tiles - Y
+    BCC cck_rm_dn   ;\\ if num_tiles < Y, past end of hand
+    BEQ cck_rm_dn   ;\\ if num_tiles = Y, at end of hand
+    JMP cck_rm_find ;\\ still within hand - keep searching
+.cck_rm_dn
     ; Hand exhausted - check if all tiles were found
-    LDA tmp8: BEQ cck_rm_done    ; all tiles removed, proceed
-    ; Not enough tiles - abort kan, restore hand count
-    ; ep_remove_at already removed some tiles, so we can't cleanly abort
-    ; Just proceed (the removals are irreversible)
+    LDA tmp8: BEQ cck_rm_done    ;\\ all 4 tiles removed, proceed
+    ; Not enough tiles - proceed anyway (removals are irreversible)
 .cck_rm_done
 
     ; Draw replacement from dead wall (rinshan draw)
@@ -5696,6 +5699,9 @@ ORG &3000
     FOR I, 0, NUM_PLAYERS-1
     EQUB 0
     NEXT
+
+; Flag set when human declines closed kan prompt (cleared on new round)
+.kan_declined EQUB 0
 
 ; Chombo penalty tracking
 .chombo_count
