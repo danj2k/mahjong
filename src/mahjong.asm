@@ -2583,7 +2583,9 @@ ORG &3000
 .gd_disc_dn
     JSR osnewl
 
-    ; YOUR MOVE prompt
+    ; YOUR MOVE prompt (only when it's the human's turn)
+    LDA current_player
+    BNE gd_move_dn
     LDY #0
 .gd_move_lp
     LDA your_move_str, Y
