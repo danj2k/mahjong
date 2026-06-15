@@ -487,6 +487,7 @@ ORG &3000
     ; Print wait count as 1-2 digits
     CMP #10: BCS ph_two_digit
     CLC: ADC #'0': JSR oswrch
+    LDY #0
     JMP ph_end_lp
 .ph_two_digit
     ; Divide by 10 for tens digit
