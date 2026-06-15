@@ -254,9 +254,9 @@ ORG &3000
     JSR game_display
     JMP mainloop
 
-; Abortive draw handler
+; Abortive draw handler - check routines already display the message and wait for key
 .ml_abortive
-    JSR display_abortive_draw
+    INC honba: INC hands_played
     JSR new_round
     BCC abortive_ok    ; if new_round returned carry clear (OK/false)
     JMP game_over
@@ -295,12 +295,7 @@ ORG &3000
     JSR check_triple_ron
     BCC ml_not_triple_ron    ; if check_triple_ron returned carry clear (OK/false)
     ; Triple ron - abortive draw
-    JSR display_abortive_draw
-    JSR new_round
-    BCC triple_ron_ok    ; if new_round returned carry clear (OK/false)
-    JMP game_over
-.triple_ron_ok
-    JMP mainloop
+    JMP ml_abortive
 .ml_not_triple_ron
     LDX ron_player: STX current_player
     ; Check for illegal ron (chombo)
@@ -1137,7 +1132,9 @@ ORG &3000
 
     ; Reveal new dora indicator
     JSR reveal_dora
-    ; Increment four kans counter
+    ; Increment per-player kans count and four kans counter
+    LDX current_player
+    INC player_kans, X
     INC four_kans_count
     RTS
 
@@ -1303,7 +1300,9 @@ ORG &3000
 
     ; Reveal new dora indicator
     JSR reveal_dora
-    ; Increment four kans counter
+    ; Increment per-player kans count and four kans counter
+    LDX current_player
+    INC player_kans, X
     INC four_kans_count
     SEC: RTS
 
@@ -5080,6 +5079,7 @@ ORG &3000
     CMP #27: BCC cfw_no
     CMP #31: BCS cfw_no
     ; All 4 first discards are winds!
+    LDA #12: JSR oswrch    ; clear screen
     JSR game_display
     LDY #0
 .cfw_msg_lp
@@ -5089,6 +5089,7 @@ ORG &3000
     JMP cfw_msg_lp
 .cfw_msg_dn
     JSR osnewl
+    JSR osrdch    ; wait for key
     SEC
     RTS
 .cfw_no
@@ -5111,6 +5112,8 @@ ORG &3000
     INX
     CPX #NUM_PLAYERS
     BNE cfk_check_lp
+    ; Clear screen and display message
+    LDA #12: JSR oswrch    ; clear screen
     JSR game_display
     LDY #0
 .cfk_msg_lp
@@ -5120,6 +5123,7 @@ ORG &3000
     JMP cfk_msg_lp
 .cfk_msg_dn
     JSR osnewl
+    JSR osrdch    ; wait for key
     SEC
     RTS
 .cfk_no
@@ -5160,6 +5164,7 @@ ORG &3000
     ; Two rons found = abortive draw
     PLA: STA ron_player
     PLA: STA ron_flag
+    LDA #12: JSR oswrch    ; clear screen
     JSR game_display
     LDY #0
 .ctr_msg_lp
@@ -5169,6 +5174,7 @@ ORG &3000
     JMP ctr_msg_lp
 .ctr_msg_dn
     JSR osnewl
+    JSR osrdch    ; wait for key
     SEC
     RTS
 .ctr_no_ron
@@ -5251,21 +5257,6 @@ ORG &3000
 ; =============================================
 ; DISPLAY ROUTINES FOR ABORTIVE DRAWS
 ; =============================================
-
-; Display abortive draw message and handle draw resolution
-; This is called when any abortive draw condition is detected
-.display_abortive_draw
-    ; The message was already displayed by the check routine
-    ; Now handle the draw resolution
-    INC honba: INC hands_played
-    LDA hands_played
-    CMP #8    ; check if max hands reached
-    BCC dad_new    ; under max - start new round
-    SEC: RTS
-.dad_new
-    JSR new_round
-    RTS
-
 ; Display nine gates win message
 .display_nine_gates
     LDY #0
