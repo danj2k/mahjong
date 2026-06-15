@@ -1764,8 +1764,8 @@ ORG &3000
     STX tmp7                 \ tmp7 = who discarded
     LDX #0
 .soc_lp
+    STX tmp5                 \\ tmp5 = checking player
     CPX tmp7: BEQ soc_skip
-    STX tmp5                 \ tmp5 = checking player
     JSR count_tiles_for_player
 
     \ Check Pon
@@ -4142,8 +4142,8 @@ ORG &3000
 .check_ron
     LDX #0
 .cr_loop
-    CPX disc_tile_player: BEQ cr_next
     STX tmp5
+    CPX disc_tile_player: BEQ cr_next
     JSR count_tiles_for_player
     LDY disc_tile_val
     LDA tile_counts, Y: CLC: ADC #1: STA tile_counts, Y
@@ -4815,8 +4815,8 @@ ORG &3000
     LDA ron_player: STA tmp5
     LDX ron_player: INX
 .ctr_loop
-    CPX disc_tile_player: BEQ ctr_next
     STX tmp6
+    CPX disc_tile_player: BEQ ctr_next
     JSR count_tiles_for_player
     LDY disc_tile_val
     LDA tile_counts, Y: CLC: ADC #1: STA tile_counts, Y
