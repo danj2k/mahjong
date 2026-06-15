@@ -90,6 +90,7 @@ ORG &3000
     LDA #7: JSR oswrch
     ; Disable keyboard autorepeat - OSBYTE &0B, X=0 (off), Y=0 (delay)
     LDA #&0B: LDX #0: LDY #0: JSR osbyte
+    JSR show_splash
     JSR difficulty_select
     JSR practice_select
     JSR game_init
@@ -5681,6 +5682,276 @@ ORG &3000
     FOR I, 0, 33
     EQUB 0
     NEXT
+
+
+; ============================================================
+; Splash screen and instructions
+; ============================================================
+
+.show_splash
+    ; Clear screen
+    LDA #12: JSR oswrch
+    ; Clear keyboard buffer (safe here - no type_input active)
+    LDA #&0F
+    LDX #0
+    JSR osbyte
+    ; Print splash text
+    LDA #<splash_text: STA ptr
+    LDA #>splash_text: STA ptr+1
+    JSR print_page
+    ; Wait for I or P
+.ss_wait
+    JSR osrdch
+    CMP #'I': BEQ show_instructions
+    CMP #'i': BEQ show_instructions
+    CMP #'P': BEQ ss_play
+    CMP #'p': BEQ ss_play
+    CMP #27: BEQ ss_play
+    JMP ss_wait
+.ss_play
+    RTS
+
+; ============================================================
+; Instructions - 5 paginated pages
+; ============================================================
+
+.show_instructions
+    LDX #0
+.si_loop
+    STX tmp4
+    ; Clear screen
+    LDA #12: JSR oswrch
+    ; Get page address
+    LDX tmp4
+    LDA page_table_lo, X: STA ptr
+    LDA page_table_hi, X: STA ptr+1
+    JSR print_page
+    ; Wait for key
+    JSR osrdch
+    CMP #27: BEQ si_exit
+    LDX tmp4
+    INX
+    CPX #5
+    BNE si_loop
+.si_exit
+    JMP show_splash
+
+; ============================================================
+; Print null-terminated text from (ptr)
+; Handles strings longer than 255 bytes
+; ============================================================
+
+.print_page
+    LDY #0
+.pp_loop
+    LDA (ptr), Y
+    BEQ pp_done
+    JSR oswrch
+    INY
+    BNE pp_loop
+    INC ptr+1
+    JMP pp_loop
+.pp_done
+    RTS
+
+; ============================================================
+; Page address tables
+; ============================================================
+
+.page_table_lo
+    EQUB <page1_text, <page2_text, <page3_text, <page4_text, <page5_text
+.page_table_hi
+    EQUB >page1_text, >page2_text, >page3_text, >page4_text, >page5_text
+
+; ============================================================
+; Splash screen text (null terminated)
+; ============================================================
+
+.splash_text
+    EQUB 13, 13
+    EQUS "         RIICHI MAHJONG"
+    EQUB 13
+    EQUS "       BBC Micro Edition"
+    EQUB 13, 13
+    EQUS "   Press I for Instructions"
+    EQUB 13
+    EQUS "        Press P to Play"
+    EQUB 13, 13, 0
+
+; ============================================================
+; Page 1: Game Overview
+; ============================================================
+
+.page1_text
+    EQUS "  RIICHI MAHJONG - Page 1/5"
+    EQUB 13, 13
+    EQUS "  Riichi Mahjong is a"
+    EQUB 13
+    EQUS "  four-player tile game"
+    EQUB 13
+    EQUS "  from Japan. Each player"
+    EQUB 13
+    EQUS "  builds a hand of 13"
+    EQUB 13
+    EQUS "  tiles, aiming to form"
+    EQUB 13
+    EQUS "  4 melds and 1 pair."
+    EQUB 13, 13
+    EQUS "  The game uses 136"
+    EQUB 13
+    EQUS "  tiles: 4 copies each"
+    EQUB 13
+    EQUS "  of 34 distinct tiles."
+    EQUB 13
+    EQUS "  These are 9 Man, 9"
+    EQUB 13
+    EQUS "  Pin, 9 Sou, and 7"
+    EQUB 13
+    EQUS "  honor tiles."
+    EQUB 13, 13
+    EQUS "  Press any key to continue"
+    EQUB 13, 0
+
+; ============================================================
+; Page 2: Tiles and Melds
+; ============================================================
+
+.page2_text
+    EQUS "  RIICHI MAHJONG - Page 2/5"
+    EQUB 13, 13
+    EQUS "  Tile Types:"
+    EQUB 13, 13
+    EQUS "  Man (Characters): 1-9m"
+    EQUB 13
+    EQUS "  Pin (Circles):    1-9p"
+    EQUB 13
+    EQUS "  Sou (Bamboo):     1-9s"
+    EQUB 13, 13
+    EQUS "  Winds: East South"
+    EQUB 13
+    EQUS "         West North"
+    EQUB 13
+    EQUS "  Dragons: Red Green"
+    EQUB 13
+    EQUS "           White"
+    EQUB 13, 13
+    EQUS "  Melds (groups of 3):"
+    EQUB 13
+    EQUS "  Pon: 3 matching tiles"
+    EQUB 13
+    EQUS "  Chii: 3 same-suit"
+    EQUB 13
+    EQUS "       sequential tiles"
+    EQUB 13
+    EQUS "  Kan: 4 matching tiles"
+    EQUB 13, 13
+    EQUS "  Press any key to continue"
+    EQUB 13, 0
+
+; ============================================================
+; Page 3: Winning
+; ============================================================
+
+.page3_text
+    EQUS "  RIICHI MAHJONG - Page 3/5"
+    EQUB 13, 13
+    EQUS "  Winning a Hand:"
+    EQUB 13, 13
+    EQUS "  You win when your hand"
+    EQUB 13
+    EQUS "  has 4 melds and 1 pair"
+    EQUB 13
+    EQUS "  (14 tiles total)."
+    EQUB 13, 13
+    EQUS "  Tsumo: Draw the final"
+    EQUB 13
+    EQUS "  tile yourself."
+    EQUB 13
+    EQUS "  Ron: Claim a discard"
+    EQUB 13
+    EQUS "  from any opponent."
+    EQUB 13, 13
+    EQUS "  After a win, count"
+    EQUB 13
+    EQUS "  han (bonus points)"
+    EQUB 13
+    EQUS "  and fu (base points)."
+    EQUB 13
+    EQUS "  More han = bigger"
+    EQUB 13
+    EQUS "  score!"
+    EQUB 13, 13
+    EQUS "  Press any key to continue"
+    EQUB 13, 0
+
+; ============================================================
+; Page 4: Riichi and Scoring
+; ============================================================
+
+.page4_text
+    EQUS "  RIICHI MAHJONG - Page 4/5"
+    EQUB 13, 13
+    EQUS "  Riichi:"
+    EQUB 13, 13
+    EQUS "  When 1 tile from win,"
+    EQUB 13
+    EQUS "  declare riichi for a"
+    EQUB 13
+    EQUS "  1000 point bet. You"
+    EQUB 13
+    EQUS "  must then discard"
+    EQUB 13
+    EQUS "  randomly each turn."
+    EQUB 13, 13
+    EQUS "  Ippatsu: Win within 1"
+    EQUB 13
+    EQUS "  turn for bonus han."
+    EQUB 13, 13
+    EQUS "  Scoring:"
+    EQUB 13
+    EQUS "  Score = han x fu."
+    EQUB 13
+    EQUS "  You need at least"
+    EQUB 13
+    EQUS "  1 han to win."
+    EQUB 13, 13
+    EQUS "  Press any key to continue"
+    EQUB 13, 0
+
+; ============================================================
+; Page 5: Special Rules
+; ============================================================
+
+.page5_text
+    EQUS "  RIICHI MAHJONG - Page 5/5"
+    EQUB 13, 13
+    EQUS "  Special Rules:"
+    EQUB 13, 13
+    EQUS "  Yakuman hands score"
+    EQUB 13
+    EQUS "  maximum points! There"
+    EQUB 13
+    EQUS "  are 12 types including"
+    EQUB 13
+    EQUS "  Thirteen Orphans and"
+    EQUB 13
+    EQUS "  All Green."
+    EQUB 13, 13
+    EQUS "  Abortive Draws:"
+    EQUB 13, 13
+    EQUS "  If 4 kans are declared"
+    EQUB 13
+    EQUS "  or 4 winds appear as"
+    EQUB 13
+    EQUS "  first discards, the"
+    EQUB 13
+    EQUS "  round is void."
+    EQUB 13, 13
+    EQUS "  Good luck and have fun!"
+    EQUB 13, 13
+    EQUS "  Press any key to exit"
+    EQUB 13, 0
+
 
 .end
 SAVE "MAHJONG", start, end, start
