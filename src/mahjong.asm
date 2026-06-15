@@ -1147,8 +1147,7 @@ ORG &3000
     STY tmp5
     TYA: ASL A: ASL A: CLC: ADC tmp5
     CLC: ADC tmp6: TAX
-    INX                  ;\ X points to tile1 of meld
-    LDA opn_melds, X    ;\ meld type
+    LDA opn_melds, X    ;\ type byte at offset +0
     CMP #1: BNE cak_next ;\ only check pons (type 1)
     INX
     LDA opn_melds, X    ;\ tile value of pon
@@ -1213,8 +1212,7 @@ ORG &3000
     STY tmp5
     TYA: ASL A: ASL A: CLC: ADC tmp5
     CLC: ADC tmp6: TAX
-    INX
-    LDA opn_melds, X
+    LDA opn_melds, X    ;\ type byte at offset +0
     CMP #1: BNE eak_meld_next  ;\ skip non-pons
     INX
     LDA opn_melds, X    ;\ tile value
