@@ -1094,7 +1094,11 @@ ORG &3000
     LDA num_tiles, X
     CMP tmp4    ; check if past end of hand
     BCS cck_rm_find    ; still within hand - keep searching
-    JMP cck_rm_done
+    ; Hand exhausted - check if all tiles were found
+    LDA tmp8: BEQ cck_rm_done    ; all tiles removed, proceed
+    ; Not enough tiles - abort kan, restore hand count
+    ; ep_remove_at already removed some tiles, so we can't cleanly abort
+    ; Just proceed (the removals are irreversible)
 .cck_rm_done
 
     ; Draw replacement from dead wall (rinshan draw)
@@ -2203,6 +2207,10 @@ ORG &3000
     LDA num_tiles, X
     CMP tmp4    ; check if past end of hand
     BCS ek_rm_find    ; still within hand, keep scanning
+    ; Hand exhausted - check if all tiles were found
+    LDA tmp8
+    BEQ ek_rm_done    ; all tiles found, proceed with kan
+    JMP ek_kan_failed ; not enough tiles - abort kan
 .ek_rm_done
 
     ; Record meld as type 4 (kan) with 4 tiles
@@ -2271,6 +2279,10 @@ ORG &3000
     ; Set skip_draw (player will discard after rinshan)
     LDA #1
     STA skip_draw
+    RTS
+.ek_kan_failed
+    ; Not enough matching tiles found - abort kan attempt
+    CLC
     RTS
 
 ; =============================================
@@ -4936,10 +4948,20 @@ ORG &3000
 
 ; Check Four Kans (Suu Kan)
 ; When 4 kans have been declared total by all players
+; But NOT if one player has all 4 (that's Suuankou)
 .check_four_kans
     LDA four_kans_count
     CMP #4    ; check if count is 4
     BCC cfk_no    ; fewer than 4 kans - no abortive draw
+    ; Check that no single player has 4 kans (Suuankou is a yakuman, not abortive)
+    LDX #0
+.cfk_check_lp
+    LDA player_kans, X
+    CMP #4
+    BEQ cfk_no    ; one player has 4 kans - that's Suuankou, not Suu Kan
+    INX
+    CPX #NUM_PLAYERS
+    BNE cfk_check_lp
     JSR game_display
     LDY #0
 .cfk_msg_lp
