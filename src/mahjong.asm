@@ -692,7 +692,7 @@ ORG &3000
 .ps_prompt_lp
     LDA pract_prompt, Y
     BEQ ps_prompt_dn    ; end of string
-    JSR osnewl: INY
+    JSR oswrch: INY
     JMP ps_prompt_lp
 .ps_prompt_dn
     ; Wait for keypress
