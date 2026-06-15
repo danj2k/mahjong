@@ -79,8 +79,7 @@ ORG &3000
 .mainloop
     LDA #0: STA tsumo_flag: STA ron_flag
     LDA skip_draw
-    JMP ml_skip_draw
-
+    BNE ml_do_skip       \ skip if flag set (forward branch, within range)
     JSR player_draw
     BCC ml_draw_ok
     \ Wall exhausted - drawn game
@@ -127,16 +126,21 @@ ORG &3000
     JMP game_over
 .tsumo_ok
 
+.ml_do_skip
+    JMP ml_skip_draw
+
 .ml_not_tsumo
     JSR check_closed_kan
-    JMP ml_kan_declared
+    BCS ml_kan_declared
     JSR check_added_kan
-    JMP ml_kan_declared
+    BCS ml_kan_declared
     JMP ml_no_kan
 .ml_kan_declared
     \\ Check for four kans abortive draw
     JSR check_four_kans
+    BCC ml_no_abort_k
     JMP ml_abortive
+.ml_no_abort_k
     JMP ml_got_tile
 .ml_no_kan
     \\ Check riichi for human player
@@ -182,9 +186,11 @@ ORG &3000
     JSR check_furiten_after_discard
     \\ Check for abortive draws after discard
     JSR check_four_winds
+    BCC ml_no_abort_a
     JMP ml_abortive
+.ml_no_abort_a
     JSR check_ron
-    JMP ml_not_ron
+    BCC ml_not_ron
     JMP ml_ron
 .ml_not_ron
     JSR check_open_calls
@@ -207,9 +213,11 @@ ORG &3000
     JSR check_furiten_after_discard
     \\ Check for abortive draws after discard
     JSR check_four_winds
+    BCC ml_no_abort_h
     JMP ml_abortive
+.ml_no_abort_h
     JSR check_ron
-    JMP ml_not_ron_h
+    BCC ml_not_ron_h
     JMP ml_ron
 .ml_not_ron_h
     JSR check_open_calls
@@ -357,8 +365,8 @@ ORG &3000
 \ Returns position (0-based) in X
 \ =============================================
 .human_input
-    \ Clear entire keyboard buffer before reading
-    LDA #&0F: LDX #0: LDY #0: JSR osbyte
+    \ Acknowledge one buffered key (clear stale chars)
+    LDA #&7E: LDX #0: JSR osbyte
     \ Now wait for a new keypress
     JSR osrdch
     CMP #'Q': BEQ quit
