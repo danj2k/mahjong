@@ -104,6 +104,8 @@ ORG &3000
     BCC draw_ok
     JMP game_over
 .draw_ok
+    \\\\ After new round, go to mainloop to draw for the dealer
+    JMP mainloop
 
 .ml_draw_ok
     JSR check_tsumo
@@ -125,6 +127,8 @@ ORG &3000
     BCC tsumo_ok
     JMP game_over
 .tsumo_ok
+    \\\\ After new round, go to mainloop to draw for the dealer
+    JMP mainloop
 
 .ml_do_skip
     JMP ml_skip_draw
@@ -262,6 +266,8 @@ ORG &3000
     BCC ron_ok
     JMP game_over
 .ron_ok
+    \\\\ After new round, go to mainloop to draw for the dealer
+    JMP mainloop
 
 .ml_ron
     \\ Check for triple ron before handling
@@ -1474,12 +1480,29 @@ ORG &3000
 \ =============================================
 
 .deal_all
-    LDX #0
-.da_lp
-    LDA wall, X: STA hands, X
+    \\ Deal 13 tiles per player using hand_bases table
+    \\ (old linear copy misaligned Player 3's hand)
+    LDA #0: STA tmp            \\ tmp = wall position
+    LDX #0                     \\ X = player counter
+.da_player
+    PHA                        \\ save player counter
+    JSR set_hand_ptr           \\ ptr = hand_bases[X], preserves X
+    LDY #0                     \\ Y = tile position in hand
+.da_tile
+    STY tmp2                   \\ save tile position
+    LDY tmp                    \\ Y = wall position
+    LDA wall, Y                \\ get tile from wall
+    INC tmp                    \\ advance wall position
+    LDY tmp2                   \\ restore tile position
+    STA (ptr), Y               \\ store tile in player's hand
+    INY
+    CPY #INITIAL_HAND          \\ done 13 tiles?
+    BNE da_tile
+    PLA: TAX                   \\ restore player counter
     INX
-    CPX #(INITIAL_HAND * NUM_PLAYERS): BNE da_lp
-    LDA #(INITIAL_HAND * NUM_PLAYERS): STA wall_pos
+    CPX #NUM_PLAYERS
+    BNE da_player
+    LDA tmp: STA wall_pos
     LDX #0
 .da_ct
     LDA #INITIAL_HAND: STA num_tiles, X
@@ -1991,8 +2014,8 @@ ORG &3000
 .ep_next
     INY: JMP ep_find
 .ep_rm2
-    \ Found 2nd copy at Y-1 (we incremented past it)
-    DEY: JSR ep_remove_at
+    \\ Found 2nd copy at Y - remove it directly
+    JSR ep_remove_at
     \ Re-find and remove first copy
     LDX current_player
     JSR set_hand_ptr
@@ -2073,7 +2096,8 @@ ORG &3000
     JSR ep_remove_at
     DEC tmp8
     BNE ek_rm_loop
-    \\ All 3 removed, fall through to ep_add
+    \\ All 3 removed - jump to ep_add (skip bounds check path)
+    JMP ep_add
 .ek_rm_nxt
     INY
     STY tmp4
@@ -4734,7 +4758,7 @@ ORG &3000
 \\\\ Check Four Winds (Suu Fon Round)
 \\\\ All 4 players discard wind tiles on the first turn (turn 1)
 .check_four_winds
-    \\ Only check after 4 players have each discarded once
+    \\\\ Only check after 4 players have each discarded once
     LDA num_discards
     CMP #1
     BNE cfw_no
@@ -4747,31 +4771,28 @@ ORG &3000
     LDA num_discards+3
     CMP #1
     BNE cfw_no
-    \\ All players have 1 discard - check if all are winds
-    \\ Player 0 first discard at disc_bases+0
-    LDA disc_bases
-    CMP #27
-    BCC cfw_no
-    CMP #31
-    BCS cfw_no
-    \\ Player 1 first discard at disc_bases+2 -> discards+MAX_DISC
-    LDA disc_bases+2
-    CMP #27
-    BCC cfw_no
-    CMP #31
-    BCS cfw_no
-    \\ Player 2 first discard at disc_bases+4 -> discards+MAX_DISC*2
-    LDA disc_bases+4
-    CMP #27
-    BCC cfw_no
-    CMP #31
-    BCS cfw_no
-    \\ Player 3 first discard at disc_bases+6 -> discards+MAX_DISC*3
-    LDA disc_bases+6
-    CMP #27
-    BCC cfw_no
-    CMP #31
-    BCS cfw_no
+    \\\\ All players have 1 discard - check if all are winds
+    \\\\ Read each player's first discard from their discard pile
+    LDX #0
+    JSR set_disc_ptr
+    LDY #0: LDA (ptr), Y
+    CMP #27: BCC cfw_no
+    CMP #31: BCS cfw_no
+    LDX #1
+    JSR set_disc_ptr
+    LDY #0: LDA (ptr), Y
+    CMP #27: BCC cfw_no
+    CMP #31: BCS cfw_no
+    LDX #2
+    JSR set_disc_ptr
+    LDY #0: LDA (ptr), Y
+    CMP #27: BCC cfw_no
+    CMP #31: BCS cfw_no
+    LDX #3
+    JSR set_disc_ptr
+    LDY #0: LDA (ptr), Y
+    CMP #27: BCC cfw_no
+    CMP #31: BCS cfw_no
     \\ All 4 first discards are winds!
     JSR game_display
     LDY #0
