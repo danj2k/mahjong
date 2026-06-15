@@ -71,6 +71,8 @@ ORG &3000
 .start
     LDA #22: JSR oswrch
     LDA #7: JSR oswrch
+    ; Disable keyboard autorepeat - OSBYTE &0B, X=0 (off), Y=0 (delay)
+    LDA #&0B: LDX #0: LDY #0: JSR osbyte
     JSR difficulty_select
     JSR practice_select
     JSR game_init
