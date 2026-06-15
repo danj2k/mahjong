@@ -2578,12 +2578,23 @@ ORG &3000
     JSR disp_open_melds
     PLA: STA tmp7
     LDX tmp7
+    JSR osnewl    ; blank line between AI player sections
     INX
     JMP gd_disc_lp
 .gd_disc_dn
     JSR osnewl
 
-    ; Instructions
+    ; YOUR MOVE prompt
+    LDY #0
+.gd_move_lp
+    LDA your_move_str, Y
+    BEQ gd_move_dn    ; end of string
+    JSR oswrch: INY
+    JMP gd_move_lp
+.gd_move_dn
+    JSR osnewl
+
+    ; Controls
     LDY #0
 .gd_inst
     LDA inst_str, Y
@@ -5371,7 +5382,10 @@ ORG &3000
     EQUS "Your Disc", 0
 
 .inst_str
-    EQUS "1-9,0,A-D discard Q quit", 0
+    EQUS "1-9,0-A-D discard  Q:quit", 0
+
+.your_move_str
+    EQUS "YOUR MOVE", 0
 
 .game_over_str
     EQUS "GAME OVER", 0
