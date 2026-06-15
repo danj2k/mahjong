@@ -484,7 +484,20 @@ ORG &3000
     JMP ph_mid_lp
 .ph_mid_dn
     LDA tmp
+    ; Print wait count as 1-2 digits
+    CMP #10: BCS ph_two_digit
     CLC: ADC #'0': JSR oswrch
+    JMP ph_end_str
+.ph_two_digit
+    ; Divide by 10 for tens digit
+    LDY #0
+.ph_div10
+    SEC: SBC #10: INY: CMP #10: BCS ph_div10
+    ; A = units, Y = tens
+    PHA
+    TYA: CLC: ADC #'0': JSR oswrch  ; tens digit
+    PLA
+    CLC: ADC #'0': JSR oswrch       ; units digit
     LDY #0
 .ph_end_lp
     LDA ph_end_str, Y
