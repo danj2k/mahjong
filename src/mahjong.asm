@@ -4670,8 +4670,8 @@ ORG &3000
 .award_tsumo
     LDX #0
 .at_lp
+    STX tmp5                ; save loop counter before possible skip
     CPX current_player: BEQ at_skip
-    STX tmp5
     LDA score_hi: STA tmp2
     LDA score_lo: STA tmp3
     LDA #0
