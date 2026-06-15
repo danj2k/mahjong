@@ -39,6 +39,11 @@ HONOR_BOUNDARY = 27       ; tiles 27-33 are honor tiles (winds + dragons)
 WIND_BASE = 27            ; wind tiles start at index 27
 DRAGON_BASE = 31          ; dragon tiles start at index 31
 
+; AI difficulty thresholds
+AI_RIICHI_PAIRS = 3       ; minimum pairs for intermediate riichi
+AI_DEFENSE_PENALTY = 20   ; extra value for safe tiles against riichi
+AI_OPEN_CALL_MIN = 3      ; minimum tile importance to call open meld
+
 ; Zero page
 ptr = &70
 ptr2 = &72
@@ -51,6 +56,9 @@ tmp6 = &79
 tmp7 = &7A
 tmp8 = &7B
 tmp10 = &7C
+tmp11 = &7D
+tmp12 = &7E
+tmp13 = &7F
 
 ; Open call flag - skip draw on next turn
 .skip_draw EQUB 0
@@ -1655,26 +1663,38 @@ ORG &3000
     LDA ai_difficulty
     CMP #2: BEQ ai_expert_discard
     CMP #1: BEQ ai_intermediate_discard
-    ; Novice: use simple evaluation (current algorithm)
-    LDA #$FF: STA tmp
-    LDA #0: STA tmp2
-    LDA #0: STA tmp3
+    ; Novice: use simple evaluation (pairs +3, adjacent +2, gap +1)
+    LDA #$FF: STA tmp       ; best score so far (lowest = discard)
+    LDA #0: STA tmp2        ; best tile index
+    LDA #0: STA tmp3        ; current tile index
     JMP ai_outer
 
 .ai_intermediate_discard
-    ; Intermediate: evaluate by counting connected tiles
-    ; Score each tile: pairs +3, adjacent +2, gap +1
-    ; Same as novice but with bonus for terminal tiles
+    ; Intermediate: count pairs AND sequences (3+ connected)
+    ; Score: pairs +3, adjacent +2, gap +1, sequence +5
     LDA #$FF: STA tmp
     LDA #0: STA tmp2
     LDA #0: STA tmp3
     JMP ai_outer
 
 .ai_expert_discard
-    ; Expert: try to evaluate hand closeness to winning
-    ; Build tile counts and use a better evaluation
-    ; Score tiles by how much removing them hurts the hand
-    ; Higher score = more important = less likely to discard
+    ; Expert: defensive play + better evaluation
+    ; Check if any opponent has riichi
+    LDX current_player
+    LDA #0: STA tmp11       ; tmp11 = opponent_riichi flag
+    LDY #0
+.ai_check_riichi
+    CPY #NUM_PLAYERS: BCS ai_expert_setup
+    CPY current_player: BEQ ai_next_riichi
+    LDA riichi_declared, Y
+    BEQ ai_next_riichi
+    LDA #1: STA tmp11       ; opponent has riichi
+    JMP ai_expert_setup
+.ai_next_riichi
+    INY
+    JMP ai_check_riichi
+
+.ai_expert_setup
     LDA #$FF: STA tmp
     LDA #0: STA tmp2
     LDA #0: STA tmp3
@@ -1682,10 +1702,10 @@ ORG &3000
 
 .ai_outer
     LDY tmp3
-    CPY tmp7: BCS ai_done
+    CPY tmp7: JMP ai_done   ; hand exhausted, return best tile
     LDA (ptr), Y
-    STA tmp4
-    LDA #0: STA tmp6
+    STA tmp4                ; tmp4 = current tile being evaluated
+    LDA #0: STA tmp6        ; tmp6 = score (higher = more connected = keep)
     LDY #0
 
 .ai_inner
@@ -1693,28 +1713,33 @@ ORG &3000
     CPY tmp3: BEQ ai_next_j
     LDA (ptr), Y
     CMP tmp4: BNE ai_not_pair
+    ; Pair found: same tile as current
     LDA tmp6: CLC: ADC #3
     STA tmp6
     JMP ai_next_j
 
 .ai_not_pair
+    ; Check if both tiles are suited (not honors)
     LDA tmp4
-    CMP #27: BCS ai_next_j
+    CMP #HONOR_BOUNDARY: BCS ai_next_j
     LDA (ptr), Y
-    CMP #27: BCS ai_next_j
+    CMP #HONOR_BOUNDARY: BCS ai_next_j
     JSR check_same_suit
-    BCC ai_next_j    ; if check_same_suit returned carry clear (OK/false)
+    BCC ai_next_j            ; if check_same_suit returned carry clear (OK/false)
+    ; Same suit - calculate distance
     LDA (ptr), Y
     SEC: SBC tmp4
     BPL ai_abs
     EOR #$FF: CLC: ADC #1
 .ai_abs
     CMP #1: BNE ai_nadj1
+    ; Adjacent tiles (distance 1): +2
     LDA tmp6: CLC: ADC #2
     STA tmp6
     JMP ai_next_j
 .ai_nadj1
     CMP #2: BNE ai_next_j
+    ; Gap tiles (distance 2): +1
     LDA tmp6: CLC: ADC #1
     STA tmp6
 
@@ -1723,10 +1748,36 @@ ORG &3000
     JMP ai_inner
 
 .ai_eval_done
+    ; Expert: apply defensive bonus if opponent has riichi
+    LDA ai_difficulty
+    CMP #2: BNE ai_no_defense
+    LDA tmp11
+    BEQ ai_no_defense       ; no opponent riichi
+    ; Check if current tile is safe (has been discarded by any player)
+    LDA tmp4
+    JSR check_tile_safe
+    BCC ai_no_defense       ; if check_tile_safe returned carry clear (not safe)
+    ; Safe tile: give it a very low score (guaranteed discard candidate)
+    LDA #0: STA tmp6
+.ai_no_defense
+
+    ; Intermediate/Expert: bonus for sequence potential
+    LDA ai_difficulty
+    CMP #0: BEQ ai_score_update  ; novice: skip sequence check
+    ; Check if current tile is part of a sequence (has neighbor+1 and neighbor+2)
+    LDA tmp4
+    CMP #HONOR_BOUNDARY: BCS ai_score_update  ; honors can't form sequences
+    JSR check_sequence_potential
+    BCC ai_score_update     ; if check_sequence_potential returned carry clear (not found)
+    ; Part of a sequence: +5 bonus
+    LDA tmp6: CLC: ADC #5
+    STA tmp6
+
+.ai_score_update
     LDA tmp6
-    CMP tmp: BCS ai_skip
-    LDA tmp6: STA tmp
-    LDA tmp3: STA tmp2
+    CMP tmp: BCS ai_skip    ; score >= best so far: don't update
+    LDA tmp6: STA tmp       ; new best score (lower = discard)
+    LDA tmp3: STA tmp2      ; save tile index
 .ai_skip
     INC tmp3
     JMP ai_outer
@@ -1734,6 +1785,79 @@ ORG &3000
 .ai_done
     LDX tmp2
     RTS
+
+; Check if tile in A has been discarded by any player.
+; Returns carry set if safe, carry clear if not.
+.check_tile_safe
+    STA tmp13               ; save tile to check
+    LDX #0
+.cts_player_loop
+    CPX #NUM_PLAYERS: BCS cts_not_safe
+    ; Get discard count for player X
+    STX tmp9                ; save player number
+    LDA num_discards, X
+    BEQ cts_next_player     ; no discards for this player
+    STA tmp12               ; tmp12 = discard count
+    ; Calculate base offset: X * MAX_DISC
+    TXA: ASL A: ASL A: ASL A: ASL A: ASL A  ; X = player * MAX_DISC
+    TAX
+    LDY #0
+.cts_disc_loop
+    CPY tmp12: BCS cts_restore_player  ; no more discards
+    LDA discards, X
+    CMP tmp13: BEQ cts_safe   ; found matching discard - tile is safe
+    INX
+    INY
+    JMP cts_disc_loop
+.cts_restore_player
+    LDX tmp9
+.cts_next_player
+    INX
+    JMP cts_player_loop
+.cts_safe
+    SEC: RTS
+.cts_not_safe
+    CLC: RTS
+
+; Check if tile in A is part of a sequence (A-2, A-1 in hand).
+; Returns carry set if part of sequence, carry clear if not.
+.check_sequence_potential
+    STA tmp13               ; save tile
+    ; Check if tile-2 exists in hand
+    SEC: SBC #2
+    BCC csp_check_mid       ; underflow
+    JSR check_tile_in_hand
+    BCS csp_found           ; found tile-2: part of sequence
+.csp_check_mid
+    LDA tmp13
+    SEC: SBC #1
+    BCC csp_not_found
+    JSR check_tile_in_hand
+    BCS csp_found           ; found tile-1: part of sequence
+.csp_not_found
+    CLC: RTS
+.csp_found
+    SEC: RTS
+
+; Check if tile in A is in the current player's hand.
+; Returns carry set if found, carry clear if not.
+.check_tile_in_hand
+    STA tmp13               ; save tile
+    LDX current_player
+    JSR set_hand_ptr
+    LDA num_tiles, X
+    STA tmp12               ; tmp12 = hand size
+    LDY #0
+.ctih_loop
+    CPY tmp12: BCS ctih_not_found
+    LDA (ptr), Y
+    CMP tmp13: BEQ ctih_found
+    INY
+    JMP ctih_loop
+.ctih_found
+    SEC: RTS
+.ctih_not_found
+    CLC: RTS
 
 ; Check same suit for tile in tmp4 and (ptr),Y. C set if same.
 .check_same_suit
