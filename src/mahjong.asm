@@ -5313,9 +5313,9 @@ ORG &3000
     .diff_novice
         EQUS "1: Novice    - Simple AI, always calls", 0
     .diff_inter
-        EQUS "2: Intermediate - Smarter AI, selective calls", 0
+        EQUS "2: Intermediate - Selective AI calls", 0
     .diff_expert
-        EQUS "3: Expert    - Strategic AI, defensive play", 0
+        EQUS "3: Expert - Strategic, defensive AI", 0
     .diff_prompt
         EQUS "Press 1, 2, or 3:", 0
 .pract_title
