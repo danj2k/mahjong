@@ -5080,9 +5080,10 @@ ORG &3000
     LDY #0: LDA (ptr), Y
     CMP #27: BCC cfw_no
     CMP #31: BCS cfw_no
-    ; All 4 first discards are winds!
+    ; Clear screen and display message
     LDA #12: JSR oswrch    ; clear screen
     JSR game_display
+    JSR osnewl              ; newline after game display
     LDY #0
 .cfw_msg_lp
     LDA abortive_four_winds_str, Y
@@ -5099,24 +5100,59 @@ ORG &3000
     RTS
 
 ; Check Four Kans (Suu Kan)
-; When 4 kans have been declared total by all players
-; But NOT if one player has all 4 (that's Suuankou)
+; Scan opn_melds for actual kan melds (types 3 and 4) across all players.
+; Avoids relying on four_kans_count which can get corrupted.
+; Suu Kan = 4 kans total across multiple players.
+; If one player has all 4 kans, that's Suuankou (yakuman), not abortive.
 .check_four_kans
-    LDA four_kans_count
-    CMP #4    ; check if count is 4
-    BCC cfk_no    ; fewer than 4 kans - no abortive draw
-    ; Check that no single player has 4 kans (Suuankou is a yakuman, not abortive)
     LDX #0
-.cfk_check_lp
+    STX tmp5            ; tmp5 = total kan count
+.cfk_player_lp
+    STX tmp6            ; tmp6 = current player
+    ; Calculate base offset into opn_melds: player * 20
+    TXA: ASL A: ASL A
+    STA tmp4
+    TXA: ASL A: ASL A: ASL A: ASL A
+    CLC: ADC tmp4
+    STA tmp4            ; tmp4 = player * 20
+    ; Get meld count for this player
+    LDX tmp6
+    LDY opn_count, X
+    BEQ cfk_next_player ; no melds - skip
+    STY tmp7            ; tmp7 = meld count
+    ; Scan each meld for kan type (3 or 4)
+.cfk_meld_lp
+    DEY
+    STY tmp8            ; save meld index
+    TYA: ASL A: ASL A: CLC: ADC tmp8
+    CLC: ADC tmp4: TAX
+    LDA opn_melds, X   ; type byte
+    CMP #3: BEQ cfk_is_kan
+    CMP #4: BEQ cfk_is_kan
+    JMP cfk_meld_next
+.cfk_is_kan
+    INC tmp5            ; total kan count++
+    ; Check if this player alone has 4 kans
+    LDX tmp6
     LDA player_kans, X
     CMP #4
-    BEQ cfk_no    ; one player has 4 kans - that's Suuankou, not Suu Kan
+    BEQ cfk_no          ; Suuankou - not abortive draw
+.cfk_meld_next
+    LDY tmp8
+    CPY #0: BNE cfk_meld_lp
+.cfk_next_player
+    LDX tmp6
     INX
     CPX #NUM_PLAYERS
-    BNE cfk_check_lp
-    ; Clear screen and display message
+    BNE cfk_player_lp
+    ; Check total: need 4 kans for Suu Kan
+    LDA tmp5
+    CMP #4
+    BCC cfk_no          ; fewer than 4 kans total
+    ; Clear screen, show game state, print message on new line
     LDA #12: JSR oswrch    ; clear screen
     JSR game_display
+    JSR osnewl              ; newline after game display
     LDY #0
 .cfk_msg_lp
     LDA abortive_four_kans_str, Y
@@ -5168,6 +5204,7 @@ ORG &3000
     PLA: STA ron_flag
     LDA #12: JSR oswrch    ; clear screen
     JSR game_display
+    JSR osnewl              ; newline after game display
     LDY #0
 .ctr_msg_lp
     LDA abortive_triple_ron_str, Y
