@@ -266,6 +266,7 @@ ORG &3000
     BCC abortive_ok    ; if new_round returned carry clear (OK/false)
     JMP game_over
 .abortive_ok
+    JSR game_display
     JMP mainloop
 
 .ml_tsumo
