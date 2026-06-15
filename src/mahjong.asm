@@ -337,25 +337,25 @@ ORG &3000
     JSR disp_points_line
     JSR osnewl
     ; Find and display the winner (highest points)
-    LDX #0: STX tmp5          ; tmp5 = highest index
-    LDX #1
+    LDX #0: STX tmp5          ; tmp5 = highest player index
+    LDX #1                     ; start comparing from player 1
 .go_find_lp
     CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
     BCS go_show_winner    ; all players checked - show winner
     STX tmp6
-    TXA: ASL A: TAX
-    LDA player_points+1, X
-    LDY tmp5: TYA: ASL A: TAY
-    CMP player_points+1, Y    ; compare against player points
-    BCC go_find_next    ; current player has fewer points
-    BNE go_new_high    ; new high score found
-    LDA player_points, X
-    CMP player_points, Y    ; compare against player points
-    BCC go_find_next    ; current player has fewer points
+    TXA: ASL A: TAX         ; X = current player byte offset
+    LDY tmp5: TYA: ASL A: TAY  ; Y = highest player byte offset
+    LDA player_points+1, X  ; A = current player high byte
+    CMP player_points+1, Y  ; compare high bytes
+    BCC go_find_next        ; current high < highest high
+    BNE go_new_high         ; current high > highest high
+    LDA player_points, X    ; high bytes equal - compare low bytes
+    CMP player_points, Y    ; compare low bytes
+    BCC go_find_next        ; current low < highest low
 .go_new_high
-    LDX tmp6: STX tmp5
+    LDX tmp6: STX tmp5      ; update highest to current player
 .go_find_next
-    LDX tmp6: INX
+    LDX tmp6: INX           ; next player
     JMP go_find_lp
 .go_show_winner
     LDY #0
