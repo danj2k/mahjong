@@ -1608,6 +1608,8 @@ ORG &3000
     LDA furiten_flags, X
     AND #&FE              ; clear bit 0 (temp furiten)
     STA furiten_flags, X
+    ; Clear first_turn after first discard (prevents false tenhou/chiihou)
+    LDA #0: STA first_turn
     RTS
 
 ; =============================================
