@@ -1079,6 +1079,7 @@ ORG &3000
     JMP cck_next    ; Y = tmp9, then INY + JMP cck_scan
 
 .cck_do_it
+    LDY tmp9              ; restore tile index (Y was clobbered by prompt printing)
     JSR execute_closed_kan
     SEC: RTS
 
@@ -1114,8 +1115,8 @@ ORG &3000
     INC opn_count, X
 
     ; Remove 4 copies of the kan tile from hand
-    ; Note: set_hand_ptr clobbers tmp5, so save tile value in tmp6
-    LDA tmp5: STA tmp6   ;\\ tmp6 = tile value (survives set_hand_ptr)
+    ; Note: ep_remove_at clobbers tmp6, so use tmp7 for tile value
+    LDA tmp5: STA tmp7   ;\\ tmp7 = tile value (survives ep_remove_at)
     LDA #4: STA tmp8     ;\\ tmp8 = tiles remaining to remove
 .cck_rm_lp
     LDX current_player
@@ -1123,7 +1124,7 @@ ORG &3000
     LDY #0
 .cck_rm_find
     LDA (ptr), Y
-    CMP tmp6: BNE cck_rm_nxt
+    CMP tmp7: BNE cck_rm_nxt
     JSR ep_remove_at     ;\\ remove tile at Y, shift hand left, DEC num_tiles
     DEC tmp8
     BNE cck_rm_lp        ;\\ more tiles to remove
