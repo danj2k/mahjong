@@ -67,6 +67,9 @@ skip_draw = &8E
 disc_tile_val = &8F
 disc_tile_player = &90
 
+; Flag set when human declines closed kan prompt
+kan_declined = &91
+
 
 ; Meld decomposition result storage
 ; Temp variable for open call routines
@@ -1021,6 +1024,13 @@ ORG &3000
 ; For AI: always declares. For human: prompts Y/N.
 ; Returns C set if kan declared.
 .check_closed_kan
+    ; If human previously declined, don't re-prompt
+    LDX current_player
+    CPX #0    ; check if human player
+    BNE cck_start    ; not human - always proceed
+    LDA kan_declined
+    BNE cck_no    ; declined earlier - skip
+.cck_start
     LDX current_player
     JSR build_tile_counts
     LDY #0             ;\ Y = tile index to scan
@@ -1063,7 +1073,8 @@ ORG &3000
     JSR osrdch
     CMP #'Y': BEQ cck_do_it
     CMP #'y': BEQ cck_do_it
-    ; User said no - continue scanning for other kans
+    ; User said no - set flag and continue scanning for other kans
+    LDA #1: STA kan_declined
     LDY tmp9
     JMP cck_next    ; Y = tmp9, then INY + JMP cck_scan
 
@@ -1591,6 +1602,11 @@ ORG &3000
 ; Discard tile at position X (0-based) for current player
 .player_discard
     STX tmp
+    ; Clear kan decline flag when human discards
+    LDX current_player
+    CPX #0: BNE pd_not_human
+    LDA #0: STA kan_declined
+.pd_not_human
     LDX current_player
     JSR set_hand_ptr
     LDY tmp
@@ -2499,10 +2515,7 @@ ORG &3000
     JSR practice_hint
 .gd_skip_hint
 
-    ; Human discards: "Your Disc (X)" - indented to match CPU lines
-    LDA #' ': JSR oswrch
-    LDA #' ': JSR oswrch
-    LDA #' ': JSR oswrch
+    ; Human discards: "Your Disc (X): tiles"
     LDY #0
 .gd_mydi
     LDA my_disc_str, Y
@@ -2517,6 +2530,7 @@ ORG &3000
     JSR tile_num_char: JSR oswrch
     LDA #')': JSR oswrch
     LDA #':': JSR oswrch
+    LDA #' ': JSR oswrch    ; space after colon to align tiles with CPU discards
     LDX #0
     JSR set_disc_ptr
     LDY num_discards, X
@@ -4940,9 +4954,10 @@ ORG &3000
     ; Advance the round (update dealer, check game end)
     JSR advance_round
     BCS nr_game_over    ; if advance_round returned carry set (error/true)
-    ; Clear keyboard buffer and wait for user to see score
+    ; Clear kan decline flag for new hand
+    LDA #0: STA kan_declined
+    ; Wait for user to see score, then rebuild wall
     JSR osrdch
-    ; Rebuild wall
     JSR wall_build
     JSR wall_shuffle
     JSR deal_all
