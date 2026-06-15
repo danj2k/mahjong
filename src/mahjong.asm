@@ -93,6 +93,8 @@ ORG &3000
     JSR show_splash
     JSR difficulty_select
     JSR practice_select
+    ; Seed RNG from hardware System VIA timer (microsecond counter)
+    LDA &FE44: STA rng_seed
     JSR game_init
     JSR game_display
 
