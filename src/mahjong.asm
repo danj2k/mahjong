@@ -3138,6 +3138,8 @@ ORG &3000
     STA yakuman_flags2
 .cs_no_chuuren
 
+    ; Skip over subroutine definitions to reach score calculation
+    JMP cs_post_yakuman
 
     ; TENHOU: dealer wins with initial 14 tiles (13 han yakuman)
 .check_tenhou
@@ -3285,6 +3287,7 @@ ORG &3000
 .cp_fail
     CLC: RTS
 
+.cs_post_yakuman
     ; If any yakuman detected, set han_count to 13 and skip fu calculation
     LDA yakuman_flags
     BNE cs_is_yakuman    ; yakuman detected - set han to 13
@@ -4529,10 +4532,10 @@ ORG &3000
     LDA yakuman_flags
     BNE dsr_is_yakuman    ; yakuman hand detected
     LDA yakuman_flags2
-    BEQ dsr_norm    ; no yakuman - show normal han/fu
-.dsr_is_yakuman
+    BNE dsr_is_yakuman    ; yakuman hand detected in flags2
+    ; Not yakuman - show normal han/fu
     JMP dsr_normal_han
-.dsr_norm
+.dsr_is_yakuman
 
     ; Display yakuman type
     LDA yakuman_flags: AND #&01: BEQ dsr_no_suuk
