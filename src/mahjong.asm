@@ -30,6 +30,15 @@ MELD_SIZE = 5
 DEAD_WALL_SIZE = 14
 DORA_START = TOTAL_TILES - DEAD_WALL_SIZE
 
+; Tile encoding ranges
+TILE_TYPES = 34           ; total number of distinct tile types (0-33)
+SUIT_BOUNDARY = 9         ; tiles 0-8 are man, 9-17 are pin, 18-26 are sou
+PIN_BOUNDARY = 9          ; pin tiles start at index 9
+SOU_BOUNDARY = 18         ; sou tiles start at index 18
+HONOR_BOUNDARY = 27       ; tiles 27-33 are honor tiles (winds + dragons)
+WIND_BASE = 27            ; wind tiles start at index 27
+DRAGON_BASE = 31          ; dragon tiles start at index 31
+
 ; Zero page
 ptr = &70
 ptr2 = &72
@@ -430,7 +439,7 @@ ORG &3000
     LDY #0: STY tmp6
     LDX #0
 .ph_inner
-    CPX #34: BCS ph_inner_dn
+    CPX #TILE_TYPES: BCS ph_inner_dn
     LDA tile_counts, X
     BEQ ph_inner_next    ; no tiles of this type - skip
     INC tmp6
@@ -919,7 +928,7 @@ ORG &3000
     JSR build_tile_counts
     LDY #0: STY tmp6    ; tmp6 = pair count
 .cra_pair_lp
-    CPY #34: BCS cra_inter_done
+    CPY #TILE_TYPES: BCS cra_inter_done
     LDA tile_counts, Y
     CMP #2    ; check if enough for a pair
     BCC cra_pair_next    ; carry clear
@@ -997,7 +1006,7 @@ ORG &3000
     LDY #0             ;\ Y = tile index to scan
 
 .cck_scan
-    CPY #34: BCS cck_no
+    CPY #TILE_TYPES: BCS cck_no
     LDA tile_counts, Y
     CMP #4    ; check if count is 4
     BCC cck_next    ; fewer than 4 - no kan possible
@@ -1441,7 +1450,7 @@ ORG &3000
     TYA: STA wall, X
     INX
     TXA: AND #3: BNE wb_lp
-    INY: CPY #34: BNE wb_lp
+    INY: CPY #TILE_TYPES: BNE wb_lp
     RTS
 
 .wall_shuffle
@@ -1729,20 +1738,20 @@ ORG &3000
 ; Check same suit for tile in tmp4 and (ptr),Y. C set if same.
 .check_same_suit
     LDA tmp4
-    CMP #9: BCC css_man
-    CMP #18: BCC css_pin
+    CMP #SUIT_BOUNDARY: BCC css_man
+    CMP #SOU_BOUNDARY: BCC css_pin
     LDA (ptr), Y
-    CMP #18: BCC css_no
-    CMP #27: BCS css_no
+    CMP #SOU_BOUNDARY: BCC css_no
+    CMP #WIND_BASE: BCS css_no
     SEC: RTS
 .css_man
     LDA (ptr), Y
-    CMP #9: BCS css_no
+    CMP #SUIT_BOUNDARY: BCS css_no
     SEC: RTS
 .css_pin
     LDA (ptr), Y
-    CMP #9: BCC css_no
-    CMP #18: BCS css_no
+    CMP #SUIT_BOUNDARY: BCC css_no
+    CMP #SOU_BOUNDARY: BCS css_no
     SEC: RTS
 .css_no
     CLC: RTS
@@ -1760,7 +1769,7 @@ ORG &3000
     LDA #0: LDY #0
 .ctfp_clear
     STA tile_counts, Y
-    INY: CPY #34: BNE ctfp_clear
+    INY: CPY #TILE_TYPES: BNE ctfp_clear
     LDY num_tiles, X
     BEQ ctfp_done    ; player has no tiles
     DEY
@@ -1936,9 +1945,9 @@ ORG &3000
 .try_chii_mid
     LDA disc_tile_val
     ; Check lower tile in same suit
-    CMP #9: BCC tcm_man
-    CMP #18: BCC tcm_pin
-    CMP #27: BCC tcm_sou
+    CMP #SUIT_BOUNDARY: BCC tcm_man
+    CMP #SOU_BOUNDARY: BCC tcm_pin
+    CMP #WIND_BASE: BCC tcm_sou
     CLC: RTS
 .tcm_man
     CMP #2: BCC tcm_no     ; need tile >= 2
@@ -1963,9 +1972,9 @@ ORG &3000
 ; Chii: disc tile as high end (need X-2, X-1)
 .try_chii_high
     LDA disc_tile_val
-    CMP #9: BCC tch_man
-    CMP #18: BCC tch_pin
-    CMP #27: BCC tch_sou
+    CMP #SUIT_BOUNDARY: BCC tch_man
+    CMP #SOU_BOUNDARY: BCC tch_pin
+    CMP #WIND_BASE: BCC tch_sou
     CLC: RTS
 .tch_man
     CMP #2: BCC tch_no
@@ -2499,6 +2508,19 @@ ORG &3000
     LDX dealer
     LDA seat_winds, X
     JSR tile_num_char: JSR oswrch
+    ; Print riichi sticks and honba count
+    LDA #' ': JSR oswrch
+    LDA #'R': JSR oswrch
+    LDA #':': JSR oswrch
+    LDA riichi_on_table
+    CLC: ADC #'0'
+    JSR oswrch
+    LDA #' ': JSR oswrch
+    LDA #'H': JSR oswrch
+    LDA #':': JSR oswrch
+    LDA honba
+    CLC: ADC #'0'
+    JSR oswrch
     RTS
 
 ; =============================================
@@ -2611,13 +2633,13 @@ ORG &3000
 ; A = tile value (0-33). Returns display char in A.
 ; Preserves X and Y (used by caller's loop counters).
 .tile_num_char
-    CMP #27: BCS tnc_honor
-    CMP #18: BCC tnc_cp
-    SEC: SBC #18
+    CMP #WIND_BASE: BCS tnc_honor
+    CMP #SOU_BOUNDARY: BCC tnc_cp
+    SEC: SBC #SOU_BOUNDARY
     JMP tnc_dig
 .tnc_cp
-    CMP #9: BCC tnc_dig
-    SEC: SBC #9
+    CMP #SUIT_BOUNDARY: BCC tnc_dig
+    SEC: SBC #SUIT_BOUNDARY
 .tnc_dig
     CLC: ADC #'1'
     RTS
@@ -2627,7 +2649,7 @@ ORG &3000
     STA tmp8                        ; save tile value
     TYA: PHA                        ; save Y
     LDA tmp8                        ; restore tile value
-    SEC: SBC #27
+    SEC: SBC #WIND_BASE
     TAY                             ; Y = offset into honor_nums
     LDA honor_nums, Y              ; A = display character
     STA tmp8                        ; save result
@@ -2640,9 +2662,9 @@ ORG &3000
 ; Dragons (31-33): 'g'=green(Hatsu), 'b'=blank(Haku), 'r'=red(Chun)
 ; Must preserve X and Y for caller's loop counters.
 .tile_suit_char
-    CMP #9: BCC tsc_m
-    CMP #18: BCC tsc_p
-    CMP #27: BCC tsc_s
+    CMP #SUIT_BOUNDARY: BCC tsc_m
+    CMP #SOU_BOUNDARY: BCC tsc_p
+    CMP #WIND_BASE: BCC tsc_s
     CMP #31: BEQ tsc_green
     CMP #32: BEQ tsc_white
     CMP #33: BEQ tsc_red
@@ -2676,7 +2698,7 @@ ORG &3000
 .btc_clear
     STA tile_counts, X
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE btc_clear    ; more tile types to clear
     ; Count tiles from current player's hand
     LDX current_player
@@ -2705,7 +2727,7 @@ ORG &3000
     LDA tile_counts, X
     BNE dm_found    ; found a tile to decompose
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE dm_find    ; more tiles to scan
     ; All counts are zero - all tiles decomposed successfully!
     SEC
@@ -2809,7 +2831,7 @@ ORG &3000
 
 .cw_next_pair
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE cw_try_pair    ; more tiles to try as pair
 
     ; Standard win failed - check seven pairs
@@ -2839,7 +2861,7 @@ ORG &3000
     INY             ; found a pair
 .csp_next
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE csp_loop    ; more tiles to check
     ; Must have exactly 7 pairs
     CPY #7    ; check if exactly 7 pairs found
@@ -2861,7 +2883,7 @@ ORG &3000
 .cto_clear
     STA tile_counts, X
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE cto_clear    ; not zero - condition not met
     ; Count tiles from current player's hand
     LDX current_player
@@ -2897,7 +2919,7 @@ ORG &3000
     BCS cto_fail    ; more than one pair
 .cto_next
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE cto_check    ; more tiles to check
     ; Must have exactly one pair (Y = 1)
     CPY #1    ; check if exactly 1 pair found
@@ -3186,7 +3208,7 @@ ORG &3000
     LDX #0
     STX tmp9
 .suank_dm_scan
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BEQ suank_dm_check    ; all tiles scanned - verify result
     LDA tile_counts, X
     CMP #3    ; need 3+ copies for triplet
@@ -3207,7 +3229,7 @@ ORG &3000
     LDA #0
 .suank_dm_sum
     CLC: ADC tile_counts, X
-    INX: CPX #34: BNE suank_dm_sum
+    INX: CPX #TILE_TYPES: BNE suank_dm_sum
     CMP #2    ; check if exactly 2 tiles remain (pair)
     BEQ suank_dm_yes    ; exactly a pair remaining - success
     CLC: RTS
@@ -3313,7 +3335,7 @@ ORG &3000
     CPX #26: BEQ ct_fail
     CPX #27: BCS ct_fail
 .ct_next
-    INX: CPX #34: BNE ct_loop
+    INX: CPX #TILE_TYPES: BNE ct_loop
     SEC: RTS
 .ct_fail
     CLC: RTS
@@ -3328,7 +3350,7 @@ ORG &3000
     BCC cy_pnext    ; if is_yakuhai_tile returned carry clear (OK/false)
     INC han_count
 .cy_pnext
-    INX: CPX #34: BNE cy_pair
+    INX: CPX #TILE_TYPES: BNE cy_pair
 
     ; Check open melds
     LDX current_player
@@ -3410,7 +3432,7 @@ ORG &3000
     LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
     PLA: TAX
 .ctt_next
-    INX: CPX #34: BNE ctt_try
+    INX: CPX #TILE_TYPES: BNE ctt_try
     CLC: RTS
 .ctt_found
     PLA
@@ -3449,7 +3471,7 @@ ORG &3000
     CMP #1: BNE ch_no
     LDX #27: LDA #0
 .ch_hon
-    ORA tile_counts, X: INX: CPX #34: BNE ch_hon
+    ORA tile_counts, X: INX: CPX #TILE_TYPES: BNE ch_hon
     BEQ ch_no    ; no honor tiles - not honitsu
     SEC: RTS
 .ch_no
@@ -3461,7 +3483,7 @@ ORG &3000
     CMP #1: BNE cc_no
     LDX #27: LDA #0
 .cc_hon
-    ORA tile_counts, X: INX: CPX #34: BNE cc_hon
+    ORA tile_counts, X: INX: CPX #TILE_TYPES: BNE cc_hon
     BNE cc_no    ; honor tiles present - not chinitsu
     SEC: RTS
 .cc_no
@@ -3482,10 +3504,10 @@ ORG &3000
 .cp_trip
     LDA tile_counts, Y
     CMP #3: BCS cp_no
-    INY: CPY #34: BNE cp_trip
+    INY: CPY #TILE_TYPES: BNE cp_trip
     SEC: RTS
 .cp_pnext
-    INX: CPX #34: BNE cp_pair
+    INX: CPX #TILE_TYPES: BNE cp_pair
 .cp_no
     CLC: RTS
 
@@ -3627,7 +3649,7 @@ ORG &3000
     LDX #0
     LDY #0
 .crsp_loop
-    CPX #34: BCS crsp_done
+    CPX #TILE_TYPES: BCS crsp_done
     LDA tile_counts, X
     BEQ crsp_next    ; no tiles here - not the pair
     CMP #2: BNE crsp_fail
@@ -3726,7 +3748,7 @@ ORG &3000
     ; Check all remaining melds contain terminals/honors
     LDY #0
 .ct_mcheck
-    CPY #34: BCS ct_mcheck_done
+    CPY #TILE_TYPES: BCS ct_mcheck_done
     LDA tile_counts, Y
     BEQ ct_mcheck_next    ; no tiles here - skip
     JSR is_terminal_or_honor
@@ -3746,7 +3768,7 @@ ORG &3000
 .ct_rnext
     INX: JMP ct_restore
 .ct_pnext
-    INX: CPX #34: BNE ct_pair
+    INX: CPX #TILE_TYPES: BNE ct_pair
     CLC: RTS
 .ct_mcheck_fail
 .ct_restore2
@@ -3799,7 +3821,7 @@ ORG &3000
     CLC: RTS
 .ct_ppair
     INC tmp
-    INX: CPX #34: BNE ct_pair2
+    INX: CPX #TILE_TYPES: BNE ct_pair2
     LDA tmp
     CMP #7: BNE ct_no7
     SEC: RTS
@@ -3822,7 +3844,7 @@ ORG &3000
 .csa_find_pair
     LDA tile_counts, X
     CMP #2: BEQ csa_found_pair
-    INX: CPX #34: BNE csa_find_pair
+    INX: CPX #TILE_TYPES: BNE csa_find_pair
     JMP csa_count
 .csa_found_pair
     LDA #0: STA tile_counts, X
@@ -3834,12 +3856,12 @@ ORG &3000
     CMP #3: BCC csa_next
     INC tmp
 .csa_next
-    INX: CPX #34: BNE csa_loop
+    INX: CPX #TILE_TYPES: BNE csa_loop
     ; Restore the pair to 2 for later use
     LDX #0
 .csa_restore
     LDA tile_counts, X: CMP #0: BEQ csa_rnext
-    INX: CPX #34: BNE csa_restore
+    INX: CPX #TILE_TYPES: BNE csa_restore
 .csa_rnext
     LDA #2: STA tile_counts, X
     ; Check if we have 3 or more concealed triplets
@@ -3860,7 +3882,7 @@ ORG &3000
     TXA: JSR is_terminal_or_honor_a
     BCC chr_fail    ; tile is not terminal/honor - fail
 .chr_next
-    INX: CPX #34: BNE chr_loop
+    INX: CPX #TILE_TYPES: BNE chr_loop
     SEC: RTS
 .chr_fail
     CLC: RTS
@@ -3941,7 +3963,7 @@ ORG &3000
     LDA opn_melds, X
     ; Check if it's a dragon tile
     CMP #31: BCC cd_open_next
-    CMP #34: BCS cd_open_next
+    CMP #TILE_TYPES: BCS cd_open_next
     ; It's a dragon - add 3 to count (triplet in open meld)
     TAX
     LDA tile_counts, X: CLC: ADC #3: STA tile_counts, X
@@ -3989,7 +4011,7 @@ ORG &3000
     RTS
 .ccr_next
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE ccr_loop    ; more tile types to check
     SEC
     RTS
@@ -4011,7 +4033,7 @@ ORG &3000
     RTS
 .ctu_next
     INX
-    CPX #34    ; check if all tile types scanned
+    CPX #TILE_TYPES    ; check if all tile types scanned
     BNE ctu_loop    ; more tiles to check
     SEC
     RTS
@@ -4152,7 +4174,7 @@ ORG &3000
     LDA fu_count: CLC: ADC #2: STA fu_count
     JMP cf_melds
 .cf_pnext
-    INX: CPX #34: BNE cf_pair
+    INX: CPX #TILE_TYPES: BNE cf_pair
 
 .cf_melds
     LDX current_player
@@ -4191,7 +4213,7 @@ ORG &3000
 .cf_csimp
     LDA fu_count: CLC: ADC #4: STA fu_count
 .cf_cnext
-    INX: CPX #34: BNE cf_clp
+    INX: CPX #TILE_TYPES: BNE cf_clp
 
 .cf_win_bonus
     LDA ron_flag: BEQ cf_no_ron
@@ -4333,7 +4355,7 @@ ORG &3000
     LDA tile_counts, X: CLC: ADC #2: STA tile_counts, X
     PLA: TAX
 .cwnr_next
-    INX: CPX #34: BNE cwnr_try
+    INX: CPX #TILE_TYPES: BNE cwnr_try
     CLC: RTS
 .cwnr_win
     PLA
