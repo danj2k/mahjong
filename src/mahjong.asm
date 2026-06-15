@@ -61,11 +61,11 @@ tmp12 = &7E
 tmp13 = &7F
 
 ; Open call flag - skip draw on next turn
-.skip_draw EQUB 0
+skip_draw = &8E
 
 ; Last discarded tile info
-.disc_tile_val EQUB 0
-.disc_tile_player EQUB 0
+disc_tile_val = &8F
+disc_tile_player = &90
 
 
 ; Meld decomposition result storage
@@ -5746,7 +5746,13 @@ ORG &3000
 .pp_loop
     LDA (ptr), Y
     BEQ pp_done
+    CMP #10          ; LF = line feed
+    BEQ pp_newline
     JSR oswrch
+    JMP pp_next
+.pp_newline
+    JSR osnewl
+.pp_next
     INY
     BNE pp_loop
     INC ptr+1
@@ -5768,15 +5774,15 @@ ORG &3000
 ; ============================================================
 
 .splash_text
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "         RIICHI MAHJONG"
-    EQUB 13
+    EQUB 10
     EQUS "       BBC Micro Edition"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "   Press I for Instructions"
-    EQUB 13
+    EQUB 10
     EQUS "        Press P to Play"
-    EQUB 13, 13, 0
+    EQUB 10, 10, 0
 
 ; ============================================================
 ; Page 1: Game Overview
@@ -5784,33 +5790,33 @@ ORG &3000
 
 .page1_text
     EQUS "  RIICHI MAHJONG - Page 1/5"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Riichi Mahjong is a"
-    EQUB 13
+    EQUB 10
     EQUS "  four-player tile game"
-    EQUB 13
+    EQUB 10
     EQUS "  from Japan. Each player"
-    EQUB 13
+    EQUB 10
     EQUS "  builds a hand of 13"
-    EQUB 13
+    EQUB 10
     EQUS "  tiles, aiming to form"
-    EQUB 13
+    EQUB 10
     EQUS "  4 melds and 1 pair."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  The game uses 136"
-    EQUB 13
+    EQUB 10
     EQUS "  tiles: 4 copies each"
-    EQUB 13
+    EQUB 10
     EQUS "  of 34 distinct tiles."
-    EQUB 13
+    EQUB 10
     EQUS "  These are 9 Man, 9"
-    EQUB 13
+    EQUB 10
     EQUS "  Pin, 9 Sou, and 7"
-    EQUB 13
+    EQUB 10
     EQUS "  honor tiles."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Press any key to continue"
-    EQUB 13, 0
+    EQUB 10, 0
 
 ; ============================================================
 ; Page 2: Tiles and Melds
@@ -5818,35 +5824,35 @@ ORG &3000
 
 .page2_text
     EQUS "  RIICHI MAHJONG - Page 2/5"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Tile Types:"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Man (Characters): 1-9m"
-    EQUB 13
+    EQUB 10
     EQUS "  Pin (Circles):    1-9p"
-    EQUB 13
+    EQUB 10
     EQUS "  Sou (Bamboo):     1-9s"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Winds: East South"
-    EQUB 13
+    EQUB 10
     EQUS "         West North"
-    EQUB 13
+    EQUB 10
     EQUS "  Dragons: Red Green"
-    EQUB 13
+    EQUB 10
     EQUS "           White"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Melds (groups of 3):"
-    EQUB 13
+    EQUB 10
     EQUS "  Pon: 3 matching tiles"
-    EQUB 13
+    EQUB 10
     EQUS "  Chii: 3 same-suit"
-    EQUB 13
+    EQUB 10
     EQUS "       sequential tiles"
-    EQUB 13
+    EQUB 10
     EQUS "  Kan: 4 matching tiles"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Press any key to continue"
-    EQUB 13, 0
+    EQUB 10, 0
 
 ; ============================================================
 ; Page 3: Winning
@@ -5854,35 +5860,35 @@ ORG &3000
 
 .page3_text
     EQUS "  RIICHI MAHJONG - Page 3/5"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Winning a Hand:"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  You win when your hand"
-    EQUB 13
+    EQUB 10
     EQUS "  has 4 melds and 1 pair"
-    EQUB 13
+    EQUB 10
     EQUS "  (14 tiles total)."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Tsumo: Draw the final"
-    EQUB 13
+    EQUB 10
     EQUS "  tile yourself."
-    EQUB 13
+    EQUB 10
     EQUS "  Ron: Claim a discard"
-    EQUB 13
+    EQUB 10
     EQUS "  from any opponent."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  After a win, count"
-    EQUB 13
+    EQUB 10
     EQUS "  han (bonus points)"
-    EQUB 13
+    EQUB 10
     EQUS "  and fu (base points)."
-    EQUB 13
+    EQUB 10
     EQUS "  More han = bigger"
-    EQUB 13
+    EQUB 10
     EQUS "  score!"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Press any key to continue"
-    EQUB 13, 0
+    EQUB 10, 0
 
 ; ============================================================
 ; Page 4: Riichi and Scoring
@@ -5890,33 +5896,33 @@ ORG &3000
 
 .page4_text
     EQUS "  RIICHI MAHJONG - Page 4/5"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Riichi:"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  When 1 tile from win,"
-    EQUB 13
+    EQUB 10
     EQUS "  declare riichi for a"
-    EQUB 13
+    EQUB 10
     EQUS "  1000 point bet. You"
-    EQUB 13
+    EQUB 10
     EQUS "  must then discard"
-    EQUB 13
+    EQUB 10
     EQUS "  randomly each turn."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Ippatsu: Win within 1"
-    EQUB 13
+    EQUB 10
     EQUS "  turn for bonus han."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Scoring:"
-    EQUB 13
+    EQUB 10
     EQUS "  Score = han x fu."
-    EQUB 13
+    EQUB 10
     EQUS "  You need at least"
-    EQUB 13
+    EQUB 10
     EQUS "  1 han to win."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Press any key to continue"
-    EQUB 13, 0
+    EQUB 10, 0
 
 ; ============================================================
 ; Page 5: Special Rules
@@ -5924,33 +5930,33 @@ ORG &3000
 
 .page5_text
     EQUS "  RIICHI MAHJONG - Page 5/5"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Special Rules:"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Yakuman hands score"
-    EQUB 13
+    EQUB 10
     EQUS "  maximum points! There"
-    EQUB 13
+    EQUB 10
     EQUS "  are 12 types including"
-    EQUB 13
+    EQUB 10
     EQUS "  Thirteen Orphans and"
-    EQUB 13
+    EQUB 10
     EQUS "  All Green."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Abortive Draws:"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  If 4 kans are declared"
-    EQUB 13
+    EQUB 10
     EQUS "  or 4 winds appear as"
-    EQUB 13
+    EQUB 10
     EQUS "  first discards, the"
-    EQUB 13
+    EQUB 10
     EQUS "  round is void."
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Good luck and have fun!"
-    EQUB 13, 13
+    EQUB 10, 10
     EQUS "  Press any key to exit"
-    EQUB 13, 0
+    EQUB 10, 0
 
 
 .end
