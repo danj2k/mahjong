@@ -2623,24 +2623,6 @@ ORG &3000
 .gd_disc_dn
     JSR osnewl
 
-    ; Calculate start index for showing last 8 discards
-    ; Input: A = num_discards
-    ; Output: Y = start index, tmp6 = end index
-.calc_disc_start
-    CMP #8
-    BCS cds_over8
-    ; 8 or fewer discards - show all from index 0
-    LDY #0
-    STA tmp6
-    RTS
-.cds_over8
-    ; More than 8 discards - show last 8
-    SEC: SBC #8
-    TAY            ; Y = start index (num_discards - 8)
-    TYA: CLC: ADC #8
-    STA tmp6       ; tmp6 = end index
-    RTS
-
     ; YOUR MOVE prompt (only when it's the human's turn)
     LDA current_player
     BNE gd_move_dn
@@ -2716,6 +2698,24 @@ ORG &3000
     LDA honba
     CLC: ADC #'0'
     JSR oswrch
+    RTS
+
+; Calculate start index for showing last 8 discards
+; Input: A = num_discards
+; Output: Y = start index, tmp6 = end index
+.calc_disc_start
+    CMP #8
+    BCS cds_over8
+    ; 8 or fewer discards - show all from index 0
+    LDY #0
+    STA tmp6
+    RTS
+.cds_over8
+    ; More than 8 discards - show last 8
+    SEC: SBC #8
+    TAY            ; Y = start index (num_discards - 8)
+    TYA: CLC: ADC #8
+    STA tmp6       ; tmp6 = end index
     RTS
 
 ; =============================================
