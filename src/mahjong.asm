@@ -991,6 +991,7 @@ ORG &3000
 
 ; Display riichi prompt for human player
 .riichi_display_prompt
+    JSR osnewl
     LDY #0
 .rdp_lp
     LDA riichi_ask, Y
@@ -1036,11 +1037,12 @@ ORG &3000
     ; Y = tile index from scan loop. Save it first.
     STY tmp9
     ; Display "Declare Closed Kan" prompt
+    JSR osnewl
     LDY #0
 .cck_prompt_lp
     LDA closed_kan_ask, Y
     BEQ cck_prompt_dn    ; end of string
-    JSR osnewl: JSR oswrch: INY
+    JSR oswrch: INY
     JMP cck_prompt_lp
 .cck_prompt_dn
     ; Show which tile: " tile "
@@ -1189,11 +1191,12 @@ ORG &3000
 .cak_human_ask
     ; tmp8 = tile value from scan. Save it.
     ; Display "Declare Added Kan" prompt
+    JSR osnewl
     LDY #0
 .cak_prompt_lp
     LDA added_kan_ask, Y
     BEQ cak_prompt_dn    ; end of string
-    JSR osnewl: JSR oswrch: INY
+    JSR oswrch: INY
     JMP cak_prompt_lp
 .cak_prompt_dn
     ; Show which tile: " tile "
@@ -1884,11 +1887,12 @@ ORG &3000
 
 ; Prompt for Pon
 .soc_human_prompt_pon
+    JSR osnewl
     LDY #0
 .shp_lp
     LDA pon_ask_str, Y
     BEQ shp_dn    ; end of string
-    JSR osnewl: JSR oswrch: INY
+    JSR oswrch: INY
     JMP shp_lp
 .shp_dn
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
@@ -1901,11 +1905,12 @@ ORG &3000
 
 ; Prompt for Chii
 .soc_human_prompt_chii
+    JSR osnewl
     LDY #0
 .shc_lp
     LDA chii_ask_str, Y
     BEQ shc_dn    ; end of string
-    JSR osnewl: JSR oswrch: INY
+    JSR oswrch: INY
     JMP shc_lp
 .shc_dn
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
@@ -1918,11 +1923,12 @@ ORG &3000
 
 ; Prompt for Kan from discard
 .soc_human_prompt_kan
+    JSR osnewl
     LDY #0
 .shk_lp
     LDA kan_ask_str, Y
     BEQ shk_dn    ; end of string
-    JSR osnewl: JSR oswrch: INY
+    JSR oswrch: INY
     JMP shk_lp
 .shk_dn
     LDA #&0F: LDX #0: LDY #0: JSR osbyte
