@@ -2499,7 +2499,10 @@ ORG &3000
     JSR practice_hint
 .gd_skip_hint
 
-    ; Human discards: "Your Disc (X)"
+    ; Human discards: "Your Disc (X)" - indented to match CPU lines
+    LDA #' ': JSR oswrch
+    LDA #' ': JSR oswrch
+    LDA #' ': JSR oswrch
     LDY #0
 .gd_mydi
     LDA my_disc_str, Y
@@ -2533,6 +2536,9 @@ ORG &3000
     ; Show human open melds
     LDX #0
     JSR disp_open_melds
+
+    ; Blank line between human and CPU sections
+    JSR osnewl
 
     ; AI discards (players 1-3)
     LDX #1
