@@ -5833,10 +5833,6 @@ ORG &3000
 .show_splash
     ; Clear screen
     LDA #12: JSR oswrch
-    ; Clear keyboard buffer (safe here - no type_input active)
-    LDA #&0F
-    LDX #0
-    JSR osbyte
     ; Print splash text
     LDA #<splash_text: STA ptr
     LDA #>splash_text: STA ptr+1
