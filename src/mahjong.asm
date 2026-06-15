@@ -2573,19 +2573,6 @@ ORG &3000
     BEQ dpl_done    ; zero - condition met
     JMP dpl_lp
 .dpl_done
-    ; Print honba and riichi sticks
-    LDA #' ': JSR oswrch
-    LDA #'H': JSR oswrch
-    LDA #':': JSR oswrch
-    LDA honba
-    CLC: ADC #'0'
-    JSR oswrch
-    LDA #' ': JSR oswrch
-    LDA #'R': JSR oswrch
-    LDA #':': JSR oswrch
-    LDA riichi_on_table
-    CLC: ADC #'0'
-    JSR oswrch
     RTS
 
 ; Print 16-bit value as 5 decimal digits
