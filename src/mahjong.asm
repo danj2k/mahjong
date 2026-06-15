@@ -4582,13 +4582,19 @@ ORG &3000
     LDA tsumo_msg, Y: BEQ dsr_tmsg_dn
     JSR oswrch: INY: JMP dsr_tmsg
 .dsr_tmsg_dn
-    JMP dsr_yaku
+    JMP dsr_player
 .dsr_ron
     LDY #0
 .dsr_rmsg
     LDA ron_msg, Y: BEQ dsr_rmsg_dn
     JSR oswrch: INY: JMP dsr_rmsg
 .dsr_rmsg_dn
+
+.dsr_player
+    ; Print " P" followed by player number (1-4)
+    LDA #' ': JSR oswrch
+    LDA #'P': JSR oswrch
+    LDA current_player: CLC: ADC #1: CLC: ADC #'0': JSR oswrch
 
 .dsr_yaku
     JSR osnewl
@@ -4867,7 +4873,16 @@ ORG &3000
     LDA han_lbl, Y: BEQ dsr_han_dn
     JSR oswrch: INY: JMP dsr_han
 .dsr_han_dn
-    LDA han_count: CLC: ADC #'0': JSR oswrch
+    ; Print han_count as up to 2 digits
+    LDA han_count
+    LDX #0
+.dsr_h10
+    CMP #10: BCC dsr_h10dn
+    SEC: SBC #10: INX: JMP dsr_h10
+.dsr_h10dn
+    PHA
+    TXA: CLC: ADC #'0': JSR oswrch
+    PLA: CLC: ADC #'0': JSR oswrch
     LDA #' ': JSR oswrch
 
     LDY #0
