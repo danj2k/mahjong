@@ -1485,7 +1485,7 @@ ORG &3000
     LDA #0: STA tmp            ;\ tmp = wall position
     LDX #0                     ;\ X = player counter
 .da_player
-    PHA                        ;\ save player counter
+    TXA: PHA                   ;\ save player counter (X) on stack
     JSR set_hand_ptr           ;\ ptr = hand_bases[X], preserves X
     LDY #0                     ;\ Y = tile position in hand
 .da_tile
