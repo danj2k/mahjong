@@ -5150,8 +5150,7 @@ ORG &3000
     JSR oswrch: INY
     JMP cfw_msg_lp
 .cfw_msg_dn
-    JSR osnewl
-    JSR osrdch    ; wait for key
+    JSR press_any_key
     SEC
     RTS
 .cfw_no
@@ -5219,8 +5218,7 @@ ORG &3000
     JSR oswrch: INY
     JMP cfk_msg_lp
 .cfk_msg_dn
-    JSR osnewl
-    JSR osrdch    ; wait for key
+    JSR press_any_key
     SEC
     RTS
 .cfk_no
@@ -5271,8 +5269,7 @@ ORG &3000
     JSR oswrch: INY
     JMP ctr_msg_lp
 .ctr_msg_dn
-    JSR osnewl
-    JSR osrdch    ; wait for key
+    JSR press_any_key
     SEC
     RTS
 .ctr_no_ron
@@ -5355,6 +5352,19 @@ ORG &3000
 ; =============================================
 ; DISPLAY ROUTINES FOR ABORTIVE DRAWS
 ; =============================================
+; Print "Press any key to continue" prompt
+.press_any_key
+    LDY #0
+.pak_lp
+    LDA press_any_key_str, Y
+    BEQ pak_dn
+    JSR oswrch: INY
+    JMP pak_lp
+.pak_dn
+    JSR osnewl
+    JSR osrdch    ; wait for key
+    RTS
+
 ; Display nine gates win message
 .display_nine_gates
     LDY #0
@@ -5736,6 +5746,8 @@ ORG &3000
     EQUS "ABORTIVE DRAW - Triple Ron!", 0
 .abortive_nine_gates_str
     EQUS "NINE GATES WIN!", 0
+.press_any_key_str
+    EQUS "Press any key to continue", 0
 .chombo_str
     EQUS "CHOMBO - PENALTY!", 0
 .chombo_pay_str
