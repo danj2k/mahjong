@@ -5393,6 +5393,7 @@ ORG &3000
 ; =============================================
 ; Print "Press any key to continue" prompt
 .press_any_key
+    JSR osnewl
     LDY #0
 .pak_lp
     LDA press_any_key_str, Y
