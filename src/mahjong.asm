@@ -2528,7 +2528,7 @@ ORG &3000
 ; =============================================
 
 ; Display points for all 4 players + honba
-; Format: P1:25000 P2:25000 P3:25000 P4:25000 H:0
+; Format: N:XXXXX[F/R/C]   (3 spaces between players)
 .disp_points_line
     LDX #0
 .dpl_lp
@@ -2544,33 +2544,35 @@ ORG &3000
     TAX
     PLA                     ; A=high, X=low
     JSR print_num16
-    ; Print space between players
+    ; Separator between players (indicator + 3 spaces)
     LDA tmp5
-    CMP #NUM_PLAYERS-1    ; check if last player in score line
-    BEQ dpl_honba    ; zero - condition met
-    ; Show F marker if furiten, R if riichi, space otherwise
+    CMP #NUM_PLAYERS-1    ; last player?
+    BEQ dpl_done    ; skip separator after last player
     LDY tmp5
     LDA furiten_flags, Y
     BEQ dpl_no_furi    ; not furiten - check riichi
     LDA #'F': JSR oswrch
-    JMP dpl_honba
+    JMP dpl_sp3
 .dpl_no_furi
     LDA riichi_declared, Y
     BEQ dpl_no_riichi    ; not in riichi - check chombo
     LDA #'R': JSR oswrch
-    JMP dpl_honba
+    JMP dpl_sp3
 .dpl_no_riichi
     LDA chombo_count, Y
     BEQ dpl_no_chombo    ; no chombo - print space
     LDA #'C': JSR oswrch
-    JMP dpl_honba
+    JMP dpl_sp3
 .dpl_no_chombo
     LDA #' ': JSR oswrch
-.dpl_honba
+.dpl_sp3
+    LDA #' ': JSR oswrch    ; extra space 1
+    LDA #' ': JSR oswrch    ; extra space 2
+    ; Advance to next player
     LDX tmp5
     INX
-    CPX #NUM_PLAYERS    ; compare against NUM_PLAYERS
-    BEQ dpl_done    ; zero - condition met
+    CPX #NUM_PLAYERS
+    BEQ dpl_done
     JMP dpl_lp
 .dpl_done
     RTS
