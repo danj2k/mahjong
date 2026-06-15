@@ -41,6 +41,7 @@ tmp5 = &78
 tmp6 = &79
 tmp7 = &7A
 tmp8 = &7B
+tmp10 = &7C
 
 ; Open call flag - skip draw on next turn
 .skip_draw EQUB 0
@@ -1822,13 +1823,16 @@ ORG &3000
     ; Only suited tiles
     LDA disc_tile_val
     CMP #27: BCS soc_try_kan
-    ; Try 3 Chii patterns
+    ; Try 3 Chii patterns, record which one succeeded in tmp3
+    LDA #0: STA tmp3          ; assume low chii (disc, disc+1, disc+2)
     JSR try_chii_low
-    BCS soc_do_chii    ; if try_chii_low returned carry set (error/true)
+    BCS soc_do_chii
+    INC tmp3                   ; try mid chii (disc-1, disc, disc+1)
     JSR try_chii_mid
-    BCS soc_do_chii    ; if try_chii_mid returned carry set (error/true)
+    BCS soc_do_chii
+    INC tmp3                   ; try high chii (disc-2, disc-1, disc)
     JSR try_chii_high
-    BCS soc_do_chii    ; if try_chii_high returned carry set (error/true)
+    BCS soc_do_chii
     JMP soc_try_kan
 .soc_do_chii
     ; Human player: prompt first
@@ -2098,38 +2102,99 @@ ORG &3000
     STA skip_draw
     RTS
 
+; Execute Chii record: store type 2 meld with three sequential tiles.
+; tmp8 holds the base (lowest) tile; +1 and +2 complete the sequence.
+.ep_add_chii
+    ; Calculate offset into opn_melds (same formula as ep_add)
+    LDX current_player
+    TXA: ASL A: ASL A       ; * 4
+    STA tmp4
+    TXA: ASL A: ASL A: ASL A: ASL A ; * 16
+    CLC: ADC tmp4            ; = * 20
+    STA tmp4                 ; tmp4 = player * 20
+    ; Add opn_count * 5
+    LDX current_player
+    LDY opn_count, X
+    BEQ ech_off_done
+    LDA #0
+.ech_mul5
+    CLC: ADC #5
+    DEY: BNE ech_mul5
+    JMP ech_off_add
+.ech_off_done
+    LDA #0
+.ech_off_add
+    CLC: ADC tmp4
+    TAX                      ; X = offset into opn_melds
+    ; Store meld: type 2 (sequence), 3 sequential tiles from tmp8
+    LDA #2
+    STA opn_melds, X
+    INX
+    LDA tmp8
+    STA opn_melds, X        ; lowest tile (base)
+    CLC: ADC #1
+    STA opn_melds+1, X      ; middle tile (base+1)
+    CLC: ADC #1
+    STA opn_melds+2, X      ; highest tile (base+2)
+    ; Increment meld count
+    LDX current_player
+    INC opn_count, X
+    ; Remove last entry from discard pile
+    LDX disc_tile_player
+    JSR set_disc_ptr
+    LDA num_discards, X
+    SEC: SBC #1
+    STA num_discards, X
+    ; Chii is always open - allow normal draw (don't set skip_draw)
+    RTS
+
 ; Execute Chii: claim discarded tile with 2 from hand (sequence).
+; tmp3 indicates which variant (0=low, 1=mid, 2=high).
+; Compute the base tile (lowest of the three), then remove base+1 and base+2.
 .execute_chii
     LDX tmp5
     STX current_player
     JSR set_hand_ptr
-    ; Find and remove 2 tiles that form sequence with disc_tile_val
-    ; Try disc+1 and disc+2 first
-    LDA disc_tile_val: CLC: ADC #1
-    STA tmp8                 ; first tile to find
-    LDA disc_tile_val: CLC: ADC #2
-    STA tmp9                 ; second tile to find
+    ; Compute base tile based on chii variant
+    LDA disc_tile_val
+    LDY tmp3
+    BEQ ec_low         ; variant 0: base = disc (low chii)
+    DEY
+    BEQ ec_mid         ; variant 1: base = disc-1 (mid chii)
+    ; variant 2: base = disc-2 (high chii)
+    SEC: SBC #2
+    JMP ec_set_tiles
+.ec_mid
+    SEC: SBC #1
+.ec_set_tiles
+.ec_low
+    STA tmp8            ; tmp8 = base tile
+    CLC: ADC #1
+    STA tmp9            ; tmp9 = base+1 (first tile to remove)
+    LDA tmp8
+    CLC: ADC #2
+    STA tmp10           ; tmp10 = base+2 (second tile to remove)
+    ; Remove first tile (tmp9 = base+1)
     LDX current_player
     JSR set_hand_ptr
-    ; Remove tmp8
     LDY #0
 .ec_find1
     LDA (ptr), Y
-    CMP tmp8: BNE ec_n1
+    CMP tmp9: BNE ec_n1
     JSR ep_remove_at
     JMP ec_rm2
 .ec_n1
     INY: JMP ec_find1
 .ec_rm2
-    ; Re-find hand pointer and remove tmp9
+    ; Re-find hand pointer and remove second tile (tmp10 = base+2)
     LDX current_player
     JSR set_hand_ptr
     LDY #0
 .ec_find2
     LDA (ptr), Y
-    CMP tmp9: BNE ec_n2
+    CMP tmp10: BNE ec_n2
     JSR ep_remove_at
-    JMP ep_add
+    JMP ep_add_chii    ; record as type 2 (sequence)
 .ec_n2
     INY: JMP ec_find2
 
@@ -4756,7 +4821,9 @@ ORG &3000
 
 .disp_open_melds
     LDA opn_count, X
-    BEQ dom_done    ; no open melds - nothing to display
+    BNE dom_has_melds    ; has open melds - display them
+    RTS                   ; no open melds - nothing to display
+.dom_has_melds
 
     ; Save player number
     TXA: PHA
@@ -4790,9 +4857,13 @@ ORG &3000
 
     ; Print type letter
     LDA opn_melds, X
+    CMP #2: BEQ dom_chii     ; type 2 = sequence (chii)
     CMP #3: BEQ dom_kan
     CMP #4: BEQ dom_ak
     LDA #'P': JSR oswrch       ; type 1 = pon
+    JMP dom_tiles
+.dom_chii
+    LDA #'C': JSR oswrch       ; type 2 = sequence (chii)
     JMP dom_tiles
 .dom_kan
     LDA #'K': JSR oswrch       ; type 3 = closed kan
