@@ -400,22 +400,46 @@ ORG &3000
     RTS
 
 ; Parse discard key. Returns C set + position in X, or C clear.
+; Keys: Z=0 X=1 C=2 V=3 B=4 N=5 M=6 A=7 S=8 D=9 F=10 G=11 H=12 J=13
 .parse_disc_key
-    CMP #'1': BCC pdck_bad
-    CMP #':': BCS pdck_0
-    SEC: SBC #'1'
-    TAX: SEC: RTS
-.pdck_0
-    CMP #'0': BNE pdck_abc
-    LDX #9: SEC: RTS
-.pdck_abc
-    CMP #'A': BCC pdck_bad
-    CMP #'E': BCS pdck_bad
-    SEC: SBC #'A'
-    CLC: ADC #10
-    TAX: SEC: RTS
+    CMP #'A': BCC pdck_bad    ; below 'A' - not valid
+    CMP #'[': BCS pdck_bad    ; above 'Z' - not valid
+    SEC: SBC #'A'              ; A=0, B=1, ... Z=25
+    TAX
+    LDA disc_key_table, X     ; look up discard position
+    CMP #$FF: BEQ pdck_bad   ; $FF = not a discard key
+    TAX: SEC: RTS             ; C set, position in X
 .pdck_bad
     CLC: RTS
+
+; Lookup table: A-Z mapped to discard positions (0-13) or $FF for invalid
+.disc_key_table
+    EQUB 7    ; A = position 7
+    EQUB 4    ; B = position 4
+    EQUB 2    ; C = position 2
+    EQUB 9    ; D = position 9
+    EQUB $FF  ; E = not used
+    EQUB 10   ; F = position 10
+    EQUB 11   ; G = position 11
+    EQUB 12   ; H = position 12
+    EQUB $FF  ; I = not used
+    EQUB 13   ; J = position 13
+    EQUB $FF  ; K = not used (used for kan prompt)
+    EQUB $FF  ; L = not used
+    EQUB 6    ; M = position 6
+    EQUB 5    ; N = position 5
+    EQUB $FF  ; O = not used
+    EQUB $FF  ; P = not used (used for pon prompt)
+    EQUB $FF  ; Q = not used (used for quit)
+    EQUB $FF  ; R = not used (used for riichi prompt)
+    EQUB 8    ; S = position 8
+    EQUB $FF  ; T = not used
+    EQUB $FF  ; U = not used
+    EQUB 3    ; V = position 3
+    EQUB $FF  ; W = not used
+    EQUB 1    ; X = position 1
+    EQUB $FF  ; Y = not used (used for pon/chii prompt)
+    EQUB 0    ; Z = position 0
 
 ; =============================================
 ; PRACTICE MODE HINT
@@ -864,10 +888,10 @@ ORG &3000
     ; Display riichi prompt
     JSR riichi_display_prompt
 
-    ; Read Y/N key
+    ; Read R key to declare riichi
     JSR osrdch
-    CMP #'Y': BEQ crh_declare
-    CMP #'y': BEQ crh_declare
+    CMP #'R': BEQ crh_declare
+    CMP #'r': BEQ crh_declare
 
 .crh_no
     CLC: RTS
@@ -1069,10 +1093,10 @@ ORG &3000
     LDA tmp9: JSR tile_num_char: JSR oswrch
     LDA tmp9: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for key
+    ; Wait for K key to declare kan
     JSR osrdch
-    CMP #'Y': BEQ cck_do_it
-    CMP #'y': BEQ cck_do_it
+    CMP #'K': BEQ cck_do_it
+    CMP #'k': BEQ cck_do_it
     ; User said no - set flag and continue scanning for other kans
     LDA #1: STA kan_declined
     LDY tmp9
@@ -1232,10 +1256,10 @@ ORG &3000
     LDA tmp8: JSR tile_num_char: JSR oswrch
     LDA tmp8: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for key
+    ; Wait for K key to declare kan
     JSR osrdch
-    CMP #'Y': BEQ cak_do_it
-    CMP #'y': BEQ cak_do_it
+    CMP #'K': BEQ cak_do_it
+    CMP #'k': BEQ cak_do_it
     JMP cak_next
 
 .cak_do_it
@@ -5481,7 +5505,7 @@ ORG &3000
     EQUS "Your Disc", 0
 
 .inst_str
-    EQUS "1-9,0-A-D discard  Q:quit", 0
+    EQUS "Z-M,A-J discard   Q:quit", 0
 
 .your_move_str
     EQUS "YOUR MOVE", 0
@@ -5528,17 +5552,17 @@ ORG &3000
 .riichi_msg
     EQUS "RIICHI!", 0
 .riichi_ask
-    EQUS "Declare Riichi? (Y/N)", 0
+    EQUS "Declare Riichi? (R)", 0
 .riichi_no_pts
     EQUS "Need 1000+ pts!", 0
 .riichi_no_close
     EQUS "Must be closed!", 0
 
 .closed_kan_ask
-    EQUS "Declare Closed Kan? (Y/N)", 0
+    EQUS "Declare Closed Kan? (K)", 0
 
 .added_kan_ask
-    EQUS "Declare Added Kan? (Y/N)", 0
+    EQUS "Declare Added Kan? (K)", 0
 
 .pon_ask_str
     EQUS "Pon? (Y/N)", 0
@@ -5547,7 +5571,7 @@ ORG &3000
     EQUS "Chii? (Y/N)", 0
 
 .kan_ask_str
-    EQUS "Kan? (Y/N)", 0
+    EQUS "Kan? (K)", 0
 
 .press_key_str
     EQUS "Press any key...", 0
