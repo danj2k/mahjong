@@ -1979,8 +1979,8 @@ ORG &3000
     LDY #0
 .ep_find
     STY tmp4
-    LDA num_tiles, X
-    CMP tmp4
+    LDA tmp4
+    CMP num_tiles, X
     BCC skp_654
     JMP ep_add
 .skp_654
@@ -2079,11 +2079,12 @@ ORG &3000
     STY tmp4
     LDA num_tiles, X
     CMP tmp4
-    BCS ek_rm_find \\ if num_tiles >= Y, continue scanning
-    \\ Increment per-player kans count
+    BCS ek_rm_find \\\\ if num_tiles >= Y, continue scanning
+    \\\\ Increment per-player kans count
     LDX current_player
     INC player_kans, X
-    JMP ep_add     \\ past end of hand
+    INC four_kans_count
+    JMP ep_add     \\\\ past end of hand
 .ep_add
     \ Calculate offset into opn_melds
     \ offset = player * 20 + count * 5
@@ -2119,16 +2120,15 @@ ORG &3000
     \ Increment meld count
     LDX current_player
     INC opn_count, X
-    \ Remove last entry from discard pile
+    \\ Remove last entry from discard pile (use discarder, not caller)
+    LDX disc_tile_player
     JSR set_disc_ptr
     LDA num_discards, X
     SEC: SBC #1
     STA num_discards, X
-    \\ Set skip_draw
+    \\\\ Set skip_draw
     LDA #1
     STA skip_draw
-    \\ Increment four kans counter
-    INC four_kans_count
     RTS
 
 \ =============================================
@@ -4634,12 +4634,17 @@ ORG &3000
     STA ippatsu_flags, X
     STA furiten_flags, X
     INX: CPX #NUM_PLAYERS: BNE nr_ip
-    \\ Reset per-player kans count
+    \\\\ Reset per-player kans count
     LDX #0
 .nr_kans
     STA player_kans, X
     INX: CPX #NUM_PLAYERS: BNE nr_kans
-    \\ Reset yakuman flags
+    \\\\ Reset open meld count (clear between rounds)
+    LDX #0
+.nr_opn
+    STA opn_count, X
+    INX: CPX #NUM_PLAYERS: BNE nr_opn
+    \\\\ Reset yakuman flags
     STA yakuman_flags
     CLC: RTS
 .nr_game_over
