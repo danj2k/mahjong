@@ -148,6 +148,8 @@ ORG &3000
     JSR sort_hand
     JSR game_display
     JSR calculate_score
+    ; Brief delay so player can see the game board before result screen
+    JSR delay_display
     JSR display_score_result
     JSR award_tsumo
     JSR new_round
@@ -277,6 +279,7 @@ ORG &3000
     ; Nine gates win - display special message
     JSR display_nine_gates
     JSR calculate_score
+    JSR delay_display
     JSR display_score_result
     JSR award_tsumo
     JSR new_round
@@ -288,6 +291,7 @@ ORG &3000
     JSR sort_hand
     JSR game_display
     JSR calculate_score
+    JSR delay_display
     JSR display_score_result
     JSR award_ron
     JSR new_round
@@ -316,6 +320,7 @@ ORG &3000
     JSR sort_hand
     JSR game_display
     JSR calculate_score
+    JSR delay_display
     JSR display_score_result
     JSR award_ron
     JSR new_round
@@ -5391,6 +5396,25 @@ ORG &3000
     RTS
 .cng_no_match
     CLC
+    RTS
+
+; =============================================
+; DISPLAY DELAY
+; =============================================
+; Wait ~1 second so player can see the game board
+; before the tsumo/ron result screen appears.
+; Uses the 6522 VIA T1 counter at &FE44/&FE45
+; which counts down at 1MHz. The high byte changes
+; every ~65ms, so 16 changes ≈ 1 second.
+.delay_display
+    LDX #16         ; count 16 high-byte changes (~1 second)
+.delay_outer
+    LDA &FE45       ; read VIA T1 high byte
+.delay_hi
+    CMP &FE45       ; wait until it changes
+    BEQ delay_hi
+    DEX
+    BNE delay_outer
     RTS
 
 ; =============================================
