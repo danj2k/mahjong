@@ -100,7 +100,6 @@ ORG &3000
     ; Seed RNG from hardware System VIA timer (microsecond counter)
     LDA &FE44: STA rng_seed
     JSR game_init
-    JSR game_display
 
 ; --- Main loop ---
 .mainloop
