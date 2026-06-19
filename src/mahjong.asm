@@ -1593,9 +1593,15 @@ ORG &3000
     RTS
 
 .rng
+    ; 8-bit XOR-shift PRNG: period 255, no non-zero fixed points
+    ; Replaces LCG (seed*5+7) which had fixed point at &BE
+    ; causing wall_shuffle infinite loop in BeebEm
     LDA rng_seed
-    ASL A: ASL A: CLC
-    ADC rng_seed: ADC #7
+    ASL A
+    EOR rng_seed
+    STA rng_seed
+    LSR A
+    EOR rng_seed
     STA rng_seed
     RTS
 
