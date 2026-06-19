@@ -1818,17 +1818,38 @@ ORG &3000
     JMP ai_inner
 
 .ai_eval_done
-    ; Expert: apply defensive bonus if opponent has riichi
+    ; Defensive play for intermediate and expert
     LDA ai_difficulty
-    CMP #2: BNE ai_no_defense
+    CMP #1: BCC ai_no_defense    ; novice: skip defense
     LDA tmp11
-    BEQ ai_no_defense       ; no opponent riichi
-    ; Check if current tile is safe (has been discarded by any player)
+    BEQ ai_no_defense             ; no opponent riichi
+    ; Check if tile is safe (genbutsu - discarded by any player)
     LDA tmp4
     JSR check_tile_safe
-    BCC ai_no_defense       ; if check_tile_safe returned carry clear (not safe)
-    ; Safe tile: give it a very low score (guaranteed discard candidate)
+    BCC ai_not_genbutsu
+    ; Genbutsu: guaranteed safe discard
     LDA #0: STA tmp6
+    JMP ai_no_defense
+.ai_not_genbutsu
+    ; Expert: additional safety checks
+    LDA ai_difficulty
+    CMP #2: BNE ai_no_defense
+    ; Count how many copies of this tile are visible in discards
+    LDA tmp4
+    JSR count_visible_copies
+    CMP #3: BCC ai_not_3visible
+    ; 3+ copies visible: very safe (only 1 left in game)
+    LDA #1: STA tmp6
+    JMP ai_no_defense
+.ai_not_3visible
+    CMP #2: BCC ai_no_defense
+    ; 2 copies visible: somewhat safe, reduce score by 2
+    LDA tmp6
+    SEC: SBC #2
+    BCS ai_defense_save
+    LDA #0                  ; clamp to 0
+.ai_defense_save
+    STA tmp6
 .ai_no_defense
 
     ; Intermediate/Expert: bonus for sequence potential
@@ -1928,6 +1949,39 @@ ORG &3000
     SEC: RTS
 .ctih_not_found
     CLC: RTS
+
+; Count visible copies of a tile in all players' discards.
+; A = tile to check. Returns count in A (0-12).
+; Used by expert AI to assess tile safety when opponent has riichi.
+.count_visible_copies
+    STA tmp13               ; save tile
+    LDA #0: STA tmp8        ; tmp8 = count
+    LDX #0
+.cvc_player_loop
+    CPX #NUM_PLAYERS: BCS cvc_done
+    STX tmp9                ; save player
+    LDA num_discards, X
+    BEQ cvc_next_player
+    STA tmp12
+    TXA: ASL A: ASL A: ASL A: ASL A: ASL A  ; X = player * MAX_DISC
+    TAX
+    LDY #0
+.cvc_disc_loop
+    CPY tmp12: BCS cvc_restore
+    LDA discards, X
+    CMP tmp13: BNE cvc_next
+    INC tmp8                ; found a copy
+.cvc_next
+    INX: INY
+    JMP cvc_disc_loop
+.cvc_restore
+    LDX tmp9
+.cvc_next_player
+    INX
+    JMP cvc_player_loop
+.cvc_done
+    LDA tmp8                ; return count in A
+    RTS
 
 ; Check same suit for tile in tmp4 and (ptr),Y. C set if same.
 .check_same_suit
