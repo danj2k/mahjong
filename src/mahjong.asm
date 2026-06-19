@@ -965,49 +965,101 @@ ORG &3000
     LDX current_player
     ; Already declared?
     LDA riichi_declared, X
-    BNE cra_no    ; AI can't declare riichi here
+    BEQ cra_check_open    ; not yet declared - check hand
+    JMP cra_no            ; already declared: can't riichi again
+.cra_check_open
     ; Must have closed hand
     LDA opn_count, X
-    BNE cra_no    ; AI can't declare riichi here
-    ; Novice AI: always declares riichi if eligible
+    BEQ cra_open_ok       ; hand is closed: proceed
+    JMP cra_no            ; open hand: can't riichi
+.cra_open_ok
+    ; Novice: always riichi if eligible
     LDA ai_difficulty
-    BEQ cra_enough      ; 0 = novice, always riichi
-    ; Intermediate: only riichi if hand has good tiles (>= 4 pairs or 3+ sequences)
-    ; For now, intermediate and expert both skip riichi AI (conservative)
-    CMP #1    ; check if intermediate difficulty
-    BEQ cra_intermediate    ; zero - condition met
-    ; Expert: only riichi when hand is very strong (1000+ pts AND more than 2 open melds would be bad)
-    ; Conservative: skip riichi for expert too - too complex to evaluate hand quality here
-    JMP cra_no
-.cra_intermediate
-    ; Intermediate: check if player has enough pairs (at least 3) - basic hand quality check
+    BNE cra_not_novice
+    JMP cra_enough
+.cra_not_novice
+
+    ; Intermediate/Expert: evaluate hand strength before riichi
     STX tmp5
     JSR build_tile_counts
     LDY #0: STY tmp6    ; tmp6 = pair count
-.cra_pair_lp
-    CPY #TILE_TYPES: BCS cra_inter_done
+    LDY #0: STY tmp8    ; tmp8 = sequence count
+.cra_count_lp
+    CPY #TILE_TYPES: BCS cra_count_done
     LDA tile_counts, Y
-    CMP #2    ; check if enough for a pair
-    BCC cra_pair_next    ; carry clear
-    INC tmp6
-.cra_pair_next
+    CMP #2
+    BCC cra_count_next
+    INC tmp6             ; pair or triplet found
+    ; Check for potential sequence: Y, Y+1, Y+2 all present
+    ; Must be same suit - exclude boundaries (7,8 / 16,17 / 25,26+)
+    CPY #7: BEQ cra_count_next
+    CPY #8: BEQ cra_count_next
+    CPY #16: BEQ cra_count_next
+    CPY #17: BEQ cra_count_next
+    CPY #25: BCS cra_count_next
+    LDA tile_counts+1, Y
+    BEQ cra_count_next
+    LDA tile_counts+2, Y
+    BEQ cra_count_next
+    INC tmp8
+.cra_count_next
     INY
-    JMP cra_pair_lp
-.cra_inter_done
-    ; Need at least 3 pairs to consider riichi
+    JMP cra_count_lp
+.cra_count_done
     LDX tmp5
+
+    ; Hand strength = pairs*3 + sequences*5
     LDA tmp6
-    CMP #3    ; need 3+ copies for triplet
-    BCC cra_no          ; fewer than 3 pairs: don't riichi
-    ; Must have 1000+ points
+    ASL A: CLC: ADC tmp6  ; *3
+    STA tmp10
+    LDA tmp8
+    ASL A: ASL A: CLC: ADC tmp8  ; *5
+    CLC: ADC tmp10
+    STA tmp10             ; tmp10 = total strength
+
+    ; Expert: need strength >= 10
+    LDA ai_difficulty
+    CMP #2: BNE cra_inter_str
+    LDA tmp10
+    CMP #10
+    BCC cra_no            ; hand too weak
+    JMP cra_check_extra
+.cra_inter_str
+    ; Intermediate: need strength >= 8
+    LDA tmp10
+    CMP #8
+    BCC cra_no            ; hand too weak
+
+.cra_check_extra
+    ; Skip riichi if any opponent has already declared (risky into riichi battle)
+    LDY #0
+.cra_opp_lp
+    CPY #NUM_PLAYERS: BCS cra_opp_done
+    CPY current_player: BEQ cra_opp_next
+    LDA riichi_declared, Y
+    BNE cra_no            ; opponent riichi: too risky
+.cra_opp_next
+    INY
+    JMP cra_opp_lp
+.cra_opp_done
+
+    ; Skip if wall <= 15 tiles (too late in the game)
+    LDA #DORA_START
+    SEC: SBC wall_pos
+    CMP #16
+    BCC cra_no
+
+    ; Intermediate/Expert need 3000+ points (cushion for the 1000 investment)
+    LDX tmp5
     TXA: ASL A: TAX
     LDA player_points+1, X
-    CMP #>1000    ; compare against >1000
-    BCC cra_no    ; not enough points
-    BNE cra_enough    ; high byte bigger - enough points
+    CMP #>3000
+    BCC cra_no
+    BNE cra_enough
     LDA player_points, X
-    CMP #<1000    ; compare against <1000
-    BCC cra_no    ; not enough points
+    CMP #<3000
+    BCC cra_no
+    JMP cra_enough
 .cra_enough
 
     ; Deduct 1000 points
