@@ -162,6 +162,8 @@ ORG &3000
     JMP ml_skip_draw
 
 .ml_not_tsumo
+    JSR sort_hand
+    JSR game_display
     JSR check_closed_kan
     BCS ml_kan_declared    ; if check_closed_kan returned carry set (error/true)
     JSR check_added_kan
@@ -238,8 +240,7 @@ ORG &3000
     JMP mainloop
 
 .ml_human
-    JSR sort_hand
-    JSR game_display
+    \ sort_hand + game_display moved to ml_not_tsumo so kan/riichi prompts print on fresh board
     JSR human_input
     JSR player_discard
     JSR check_furiten_after_discard
