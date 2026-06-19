@@ -434,14 +434,14 @@ ORG &3000
     EQUB 12   ; H = position 12
     EQUB $FF  ; I = not used
     EQUB 13   ; J = position 13
-    EQUB $FF  ; K = not used (used for kan prompt)
+    EQUB $FF  ; K = not used
     EQUB $FF  ; L = not used
     EQUB 6    ; M = position 6
     EQUB 5    ; N = position 5
     EQUB $FF  ; O = not used
     EQUB $FF  ; P = not used (used for pon prompt)
     EQUB $FF  ; Q = not used (used for quit)
-    EQUB $FF  ; R = not used (used for riichi prompt)
+    EQUB $FF  ; R = not used
     EQUB 8    ; S = position 8
     EQUB $FF  ; T = not used
     EQUB $FF  ; U = not used
@@ -898,10 +898,10 @@ ORG &3000
     ; Display riichi prompt
     JSR riichi_display_prompt
 
-    ; Read R key to declare riichi
+    ; Read Y key to declare riichi
     JSR osrdch
-    CMP #'R': BEQ crh_declare
-    CMP #'r': BEQ crh_declare
+    CMP #'Y': BEQ crh_declare
+    CMP #'y': BEQ crh_declare
 
 .crh_no
     CLC: RTS
@@ -1155,10 +1155,10 @@ ORG &3000
     LDA tmp9: JSR tile_num_char: JSR oswrch
     LDA tmp9: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for K key to declare kan
+    ; Wait for Y key to declare kan
     JSR osrdch
-    CMP #'K': BEQ cck_do_it
-    CMP #'k': BEQ cck_do_it
+    CMP #'Y': BEQ cck_do_it
+    CMP #'y': BEQ cck_do_it
     ; User said no - set flag and continue scanning for other kans
     LDA #1: STA kan_declined
     LDY tmp9
@@ -1318,10 +1318,10 @@ ORG &3000
     LDA tmp8: JSR tile_num_char: JSR oswrch
     LDA tmp8: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for K key to declare kan
+    ; Wait for Y key to declare kan
     JSR osrdch
-    CMP #'K': BEQ cak_do_it
-    CMP #'k': BEQ cak_do_it
+    CMP #'Y': BEQ cak_do_it
+    CMP #'y': BEQ cak_do_it
     JMP cak_next
 
 .cak_do_it
@@ -5712,17 +5712,17 @@ ORG &3000
 .riichi_msg
     EQUS "RIICHI!", 0
 .riichi_ask
-    EQUS "Declare Riichi? (R)", 0
+    EQUS "Declare Riichi? (Y/N)", 0
 .riichi_no_pts
     EQUS "Need 1000+ pts!", 0
 .riichi_no_close
     EQUS "Must be closed!", 0
 
 .closed_kan_ask
-    EQUS "Declare Closed Kan? (K)", 0
+    EQUS "Declare Closed Kan? (Y/N)", 0
 
 .added_kan_ask
-    EQUS "Declare Added Kan? (K)", 0
+    EQUS "Declare Added Kan? (Y/N)", 0
 
 .pon_ask_str
     EQUS "Pon? (Y/N)", 0
