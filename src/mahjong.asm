@@ -412,6 +412,11 @@ ORG &3000
 ; Parse discard key. Returns C set + position in X, or C clear.
 ; Keys: Z=0 X=1 C=2 V=3 B=4 N=5 M=6 A=7 S=8 D=9 F=10 G=11 H=12 J=13
 .parse_disc_key
+    ; Convert lowercase a-z to uppercase A-Z
+    CMP #'a': BCC pdck_upper
+    CMP #'z'+1: BCS pdck_bad
+    SEC: SBC #32               ; 'a'->'A', 'b'->'B', etc.
+.pdck_upper
     CMP #'A': BCC pdck_bad    ; below 'A' - not valid
     CMP #'[': BCS pdck_bad    ; above 'Z' - not valid
     SEC: SBC #'A'              ; A=0, B=1, ... Z=25
@@ -1087,9 +1092,9 @@ ORG &3000
 .cra_no
     RTS
 
-; Display riichi prompt for human player
+; Display riichi prompt for human player at fixed row
 .riichi_display_prompt
-    JSR osnewl
+    JSR clear_prompt_line
     LDY #0
 .rdp_lp
     LDA riichi_ask, Y
@@ -1141,8 +1146,8 @@ ORG &3000
 .cck_human_ask
     ; Y = tile index from scan loop. Save it first.
     STY tmp9
-    ; Display "Declare Closed Kan" prompt
-    JSR osnewl
+    ; Display "Declare Closed Kan" prompt at fixed row
+    JSR clear_prompt_line
     LDY #0
 .cck_prompt_lp
     LDA closed_kan_ask, Y
@@ -1304,8 +1309,8 @@ ORG &3000
 
 .cak_human_ask
     ; tmp8 = tile value from scan. Save it.
-    ; Display "Declare Added Kan" prompt
-    JSR osnewl
+    ; Display "Declare Added Kan" prompt at fixed row
+    JSR clear_prompt_line
     LDY #0
 .cak_prompt_lp
     LDA added_kan_ask, Y
@@ -2182,7 +2187,7 @@ ORG &3000
 
 ; Prompt for Pon
 .soc_human_prompt_pon
-    JSR osnewl
+    JSR clear_prompt_line
     LDY #0
 .shp_lp
     LDA pon_ask_str, Y
@@ -2199,7 +2204,7 @@ ORG &3000
 
 ; Prompt for Chii
 .soc_human_prompt_chii
-    JSR osnewl
+    JSR clear_prompt_line
     LDY #0
 .shc_lp
     LDA chii_ask_str, Y
@@ -2216,7 +2221,7 @@ ORG &3000
 
 ; Prompt for Kan from discard
 .soc_human_prompt_kan
-    JSR osnewl
+    JSR clear_prompt_line
     LDY #0
 .shk_lp
     LDA kan_ask_str, Y
@@ -5527,6 +5532,26 @@ ORG &3000
     BEQ delay_hi
     DEX
     BNE delay_outer
+    RTS
+
+; Clear the prompt line at row 24 and position cursor there.
+; Used by kans/riichi prompts so multiple prompts overwrite each other.
+.clear_prompt_line
+    PHA
+    ; VDU 31,0,24 - position at column 0, row 24
+    LDA #31: JSR oswrch
+    LDA #0: JSR oswrch
+    LDA #24: JSR oswrch
+    ; Print 40 spaces to clear the line
+    LDX #40
+.cpl_loop
+    LDA #' ': JSR oswrch
+    DEX: BNE cpl_loop
+    ; Reposition at column 0, row 24
+    LDA #31: JSR oswrch
+    LDA #0: JSR oswrch
+    LDA #24: JSR oswrch
+    PLA
     RTS
 
 ; =============================================
