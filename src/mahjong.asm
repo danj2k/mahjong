@@ -5536,14 +5536,17 @@ ORG &3000
 
 ; Clear the prompt line at row 24 and position cursor there.
 ; Used by kans/riichi prompts so multiple prompts overwrite each other.
+; Prints 39 spaces (not 40) to avoid scrolling: 40 chars from col 0
+; fills columns 0-39 and the cursor wraps off the end, scrolling the
+; screen by one line and pushing the title off the top.
 .clear_prompt_line
     PHA
     ; VDU 31,0,24 - position at column 0, row 24
     LDA #31: JSR oswrch
     LDA #0: JSR oswrch
     LDA #24: JSR oswrch
-    ; Print 40 spaces to clear the line
-    LDX #40
+    ; Print 39 spaces to clear the line (column 39 left as-is)
+    LDX #39
 .cpl_loop
     LDA #' ': JSR oswrch
     DEX: BNE cpl_loop
