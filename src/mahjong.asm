@@ -175,6 +175,9 @@ ORG &3000
     BCC ml_no_abort_k    ; if check_four_kans returned carry clear (OK/false)
     JMP ml_abortive
 .ml_no_abort_k
+    ; Refresh screen after kan — hand has changed (4 tiles removed, 1 drawn)
+    JSR sort_hand
+    JSR game_display
     JMP ml_got_tile
 .ml_no_kan
     ; Check riichi for human player
@@ -3100,6 +3103,15 @@ ORG &3000
     PHA                 ; save again for potential backtrack
     CPX #27    ; check if tile is an honor
     BCS dm_fail    ; honor tile - can't form sequence
+    ; Check sequence stays within same suit (X mod 9 <= 6)
+    ; Without this, 9-man/1-pin/2-pin would be treated as a valid sequence
+    TXA
+.sq_mod9
+    CMP #9: BCC sq_mod9_dn
+    SEC: SBC #9
+    JMP sq_mod9
+.sq_mod9_dn
+    CMP #7: BCS dm_fail    ; X mod 9 >= 7: sequence crosses suit boundary
     ; Check tiles X+1 and X+2 exist
     LDA tile_counts+1, X
     BEQ dm_fail    ; missing tile for sequence - not possible
