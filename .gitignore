@@ -3,7 +3,9 @@
 *.dsd
 *.exe
 *.o
+*.obj
 *.labels
+MAHJONG
 
 # Editor/IDE files
 *~
