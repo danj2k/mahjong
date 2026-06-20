@@ -5634,6 +5634,7 @@ ORG &3000
 .apc_done
     ; Display chombo message
     JSR game_display
+    JSR osnewl
     LDY #0
 .apc_msg
     LDA chombo_str, Y: BEQ apc_msg_dn
