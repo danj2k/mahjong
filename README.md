@@ -251,7 +251,7 @@ cd src && beebasm -i mahjong.asm -boot MAHJONG -o ../build/MAHJONG -do ../build/
 
 | Key | Action |
 |-----|--------|
-| A–Z | Discard the tile at the corresponding position in your hand |
+| Z–M / A–J | Discard the tile at position 1–7 (Z–M, bottom QWERTY row) or 8–14 (A–J, middle row) |
 | Y | Accept a prompt (declare riichi, pon, chii, or kan) |
 | N | Decline a prompt |
 | Q | Quit the game |
