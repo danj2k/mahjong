@@ -1,14 +1,14 @@
-# Riichi Mahjong
+# 🀄 Riichi Mahjong
 
 A complete four-player Riichi Mahjong game for the BBC Micro, written in 6502 assembly language using BeebAsm. One human player faces three AI opponents, with a full implementation of Japanese mahjong rules including all 19 standard yaku, 12 yakuman, and multiple AI difficulty levels.
 
-## Transparency Notice
+## 🔍 Transparency Notice
 
 This game was developed entirely by AI tools. The 6502 assembly source code, game logic, AI routines, scoring system, and all game rules were written, tested, and debugged by AI assistants. No human programmer wrote or modified the assembly code. The BBC Micro platform constraints (Mode 7 teletext display, zero page memory management, DFS disc images) were managed entirely through AI-driven development.
 
-## How to Play
+## 🎮 How to Play
 
-### Getting Started
+### 🚀 Getting Started
 
 1. Load the disc image `mahjong.ssd` in a BBC Micro emulator (such as BeebEm or beebjit)
 2. The game boots to a title screen — press any key to continue through the information pages
@@ -16,7 +16,7 @@ This game was developed entirely by AI tools. The 6502 assembly source code, gam
 4. Select Practice Mode (ON or OFF)
 5. The first hand is dealt and you play as Player 1 (East)
 
-### Gameplay
+### 🎲 Gameplay
 
 Each hand begins with 13 tiles dealt to each player. On your turn you draw one tile (14 total), then discard one tile to return to 13. The game continues clockwise until someone wins or the wall is exhausted.
 
@@ -29,7 +29,7 @@ Each hand begins with 13 tiles dealt to each player. On your turn you draw one t
 - When an opponent discards a tile you can claim, you will be prompted with **Y/N** to accept or decline
 - You may also be prompted to declare a **Closed Kan** (4 of a kind in your hand) or a **Riichi** (1-tile-away bet)
 
-### Winning
+### 🏆 Winning
 
 A winning hand consists of **4 [melds](#melds) and 1 pair** (14 tiles total), or **7 pairs** (Chiitoitsu). There are two ways to win:
 
@@ -38,7 +38,7 @@ A winning hand consists of **4 [melds](#melds) and 1 pair** (14 tiles total), or
 
 After a win, your hand is scored by counting **han** (bonus points) and **fu** (base points). You need at least 1 han to win.
 
-### Practice Mode
+### 💡 Practice Mode
 
 When Practice Mode is ON, the game provides helpful guidance on every turn:
 
@@ -47,32 +47,32 @@ When Practice Mode is ON, the game provides helpful guidance on every turn:
 
 This is useful for learning mahjong strategy and understanding which yaku are achievable.
 
-## Difficulty Levels
+## ⚙️ Difficulty Levels
 
 The three AI opponents share a single difficulty setting:
 
-### Novice
+### 🟢 Novice
 - Basic tile selection — discards the least useful tile
 - Simple open call logic — calls pon/chii when a meld is available
 - No riichi declarations
 - No defensive play
 
-### Intermediate
+### 🟡 Intermediate
 - Smarter tile selection — evaluates pairs, sequences, and near-complete melds
 - Evaluates hand strength before making open calls
 - Declares riichi when the hand has at least 3 pairs and meets a points threshold
 - Avoids riichi when another player is already in riichi
 - Basic defensive play — considers safe tiles (genbutsu) when an opponent declares riichi
 
-### Expert
+### 🔴 Expert
 - Full hand evaluation — scores melds, pairs, sequences, and dora
 - Evaluates hand value before making open calls (minimum tile importance threshold)
 - Carefully times riichi declarations — considers hand value, wall tiles remaining, and opponent riichi status
 - Full defensive play — counts visible copies of each tile, identifies safe tiles (genbutsu), avoids discarding tiles that other players might claim
 
-## Rules
+## 📜 Rules
 
-### Tiles
+### 🀇 Tiles
 
 The game uses 136 tiles — 4 copies of each of 34 distinct tiles:
 
@@ -84,7 +84,7 @@ The game uses 136 tiles — 4 copies of each of 34 distinct tiles:
 | **Winds** | East, South, West, North | Ew, Sw, Ww, Nw |
 | **Dragons** | Red (Chun), Green (Hatsu), White (Haku) | R, Gb, Tb |
 
-### Melds
+### 🔗 Melds
 
 - **Chi** — Three consecutive tiles of the same suit (e.g. 4m 5m 6m). Only the player to the left of the discarder may declare chi.
 - **Pon** — Three identical tiles (e.g. three 5p). Any player may declare pon.
@@ -94,23 +94,23 @@ The game uses 136 tiles — 4 copies of each of 34 distinct tiles:
   - **Added Kan** — Add a 4th tile to an existing open pon
 - Each kan draws a replacement tile from the dead wall and reveals an additional dora indicator.
 
-### Riichi
+### 🎯 Riichi
 
 When your hand is **one tile away from winning** (tenpai) and your hand is closed, you may declare riichi. This costs 1000 points from your score and locks in your discards — you must discard the tile you draw each turn without changing your hand. If you win while in riichi, you score bonus points. Ippatsu (winning within one full rotation of declaring riichi) adds an extra bonus.
 
-### Abortive Draws
+### ⏸️ Abortive Draws
 
 The hand is declared void and redealt without penalty if:
 - **Four kans** are declared by all players combined
 - **Four winds** (E, S, W, N) appear as the first discard from each player
 
-### Chombo
+### ⚠️ Chombo
 
 A penalty of 8000 points (or 12000 for the dealer) is applied if an illegal call is attempted — for example, declaring chi when it is not your turn, or attempting to call a tile that does not form a valid meld.
 
-## Scoring
+## 📊 Scoring
 
-### Han (Bonus Points)
+### ⭐ Han (Bonus Points)
 
 Each yaku in your hand contributes han. Common yaku and their values:
 
@@ -122,7 +122,7 @@ Each yaku in your hand contributes han. Common yaku and their values:
 | 3 | Honitsu, Ryanpeikou, Chanta (closed) |
 | 6 | Chinitsu |
 
-### Fu (Base Points)
+### 🔢 Fu (Base Points)
 
 Fu starts at 30 for a basic hand and increases based on:
 - **Pair** — +2 fu if yakuhai (seat wind, round wind, or dragon)
@@ -133,7 +133,7 @@ Fu starts at 30 for a basic hand and increases based on:
 
 Fu is rounded up to the nearest 10.
 
-### Point Calculation
+### 🧮 Point Calculation
 
 Base points = fu × 2^(2+han). The score is then adjusted based on who wins and how:
 
@@ -141,7 +141,7 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 - **Tsumo** (self-draw): Non-dealers pay 2× base points each; dealer pays 4× base points
 - All payments are rounded up to the nearest 100
 
-### Score Limits
+### 📈 Score Limits
 
 | Limit | Han | Base Points |
 |-------|-----|-------------|
@@ -151,9 +151,9 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 | Sanbaiman | 11–12 han | 6,000 |
 | Yakuman | 13+ han | 8,000 |
 
-## Yaku
+## 🀄 Yaku
 
-### 1 Han (Open or Closed)
+### 1️⃣ 1 Han (Open or Closed)
 
 | Yaku | Japanese | Meaning |
 |------|----------|---------|
@@ -168,7 +168,7 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 | Sanshoku Doujun | 三色同順 | "Three colour same sequence" — same as above but open (1 han instead of closed) |
 | Ittsu | 一気通貫 | "Straight through" — sequences 123, 456, 789 in one suit |
 
-### 2 Han (Open or Closed)
+### 2️⃣ 2 Han (Open or Closed)
 
 | Yaku | Japanese | Meaning |
 |------|----------|---------|
@@ -179,20 +179,20 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 | Sanankou | 三暗刻 | "Three concealed triplets" — three triplets entirely within your hand (not claimed from discards) |
 | Honroutou | 混老頭 | "Mixed old man" — all tiles are terminals or honors (includes both triplets and pairs) |
 
-### 3 Han (Open or Closed)
+### 3️⃣ 3 Han (Open or Closed)
 
 | Yaku | Japanese | Meaning |
 |------|----------|---------|
 | Honitsu | 混一色 | "Mixed one colour" — tiles from only one suit plus honor tiles |
 | Ryanpeikou | 両盃口 | "Two cups" — two pairs of identical sequences in the same suit (closed only) |
 
-### 6 Han
+### 6️⃣ 6 Han
 
 | Yaku | Japanese | Meaning |
 |------|----------|---------|
 | Chinitsu | 清一色 | "Pure one colour" — tiles from only one suit, no honor tiles |
 
-## Yakuman
+## 👑 Yakuman
 
 Yakuman hands score maximum points. This game implements all 12 standard yakuman:
 
@@ -211,7 +211,7 @@ Yakuman hands score maximum points. This game implements all 12 standard yakuman
 | Tenhou | 天和 | "Heavenly Hand" — dealer wins on the very first draw |
 | Chiihou | 地和 | "Earthly Hand" — non-dealer wins on the very first draw (before their first discard) |
 
-## Tile Notation Reference
+## 📋 Tile Notation Reference
 
 Tiles are displayed in two rows in the game:
 
@@ -228,7 +228,7 @@ Bottom row: m m m p p p s s s w w w w g b r
 - **b** = Haku (White Dragon)
 - **r** = Chun (Red Dragon)
 
-## Technical Details
+## 🔧 Technical Details
 
 - **Platform:** BBC Micro (Model B or Master)
 - **Language:** 6502/65C02 assembly (BeebAsm)
@@ -237,7 +237,7 @@ Bottom row: m m m p p p s s s w w w w g b r
 - **Code size:** ~6,300 lines of assembly
 - **Memory:** Zero page confined to &00–&8D; user scratch at &70–&8F; page 2 for tile and meld data
 
-### Running
+### ▶️ Running
 
 ```bash
 # Assemble with BeebAsm
@@ -247,7 +247,7 @@ beebasm -i src/mahjong.asm -boot MAHJONG -do build/mahjong.ssd
 cd src && beebasm -i mahjong.asm -boot MAHJONG -o ../build/MAHJONG -do ../build/mahjong.ssd
 ```
 
-### Controls
+### 🎮 Controls
 
 | Key | Action |
 |-----|--------|

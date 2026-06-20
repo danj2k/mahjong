@@ -418,7 +418,13 @@ ORG &3000
     CMP #'Q': BEQ quit
     CMP #'q': BEQ quit
     JSR parse_disc_key
-    BCC human_input    ; if parse_disc_key returned carry clear (OK/false)
+    BCC human_input    ; if parse_disc_key returned carry clear (invalid key)
+    ; Check position is within hand size (0-based: valid = 0..num_tiles-1)
+    CPX num_tiles: BCC human_input_ok  ; position < num_tiles → valid
+    ; Position out of range — beep and ask again
+    LDA #7: JSR oswrch
+    JMP human_input
+.human_input_ok
     RTS
 
 ; Parse discard key. Returns C set + position in X, or C clear.
