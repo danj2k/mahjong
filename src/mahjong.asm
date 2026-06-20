@@ -2836,7 +2836,7 @@ ORG &3000
     JMP gd_cpu_move_lp
 .gd_cpu_num
     LDA current_player
-    CLC: ADC #'2'     ; P2=1+2, P3=2+2, P4=3+2
+    CLC: ADC #'0'+1  ; P2=1+1, P3=2+1, P4=3+1
     JSR oswrch
     JMP gd_move_dn
 .gd_human_move
