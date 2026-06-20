@@ -241,14 +241,14 @@ ORG &3000
 .ml_not_ron
     JSR check_open_calls
     BCS ml_call_made    ; if check_open_calls returned carry set (error/true)
-    JSR ai_delay
     JSR game_display
+    JSR ai_delay
     JSR advance_player
     JMP mainloop
 
 .ml_call_made
-    JSR ai_delay
     JSR game_display
+    JSR ai_delay
     JMP mainloop
 
 .ml_human
