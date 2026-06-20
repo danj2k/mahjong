@@ -6205,13 +6205,13 @@ ORG &3000
 ; ============================================================
 
 .splash_text
-    EQUS "         RIICHI MAHJONG"
+    EQUS "             RIICHI MAHJONG"
     EQUB 10
-    EQUS "        BBC Micro Edition"
+    EQUS "           BBC Micro Edition"
     EQUB 10, 10
-    EQUS "   Press I for Instructions"
+    EQUS "       Press I for Instructions"
     EQUB 10
-    EQUS "        Press P to Play"
+    EQUS "            Press P to Play"
     EQUB 10, 10, 0
 
 ; ============================================================
