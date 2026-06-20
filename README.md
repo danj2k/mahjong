@@ -1,6 +1,6 @@
 # 🀄 Riichi Mahjong
 
-A complete four-player Riichi Mahjong game for the BBC Micro, written in 6502 assembly language using BeebAsm. One human player faces three AI opponents, with a full implementation of Japanese mahjong rules including all 19 standard yaku, 12 yakuman, and multiple AI difficulty levels.
+A complete four-player Riichi Mahjong game for the BBC Micro, written in 6502 assembly language using [BeebAsm](https://github.com/stardot/beebasm). One human player faces three AI opponents, with a full implementation of Japanese mahjong rules including all 19 standard yaku, 12 yakuman, and multiple AI difficulty levels.
 
 ## 🔍 Transparency Notice
 
