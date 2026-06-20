@@ -2824,9 +2824,22 @@ ORG &3000
 .gd_disc_dn
     JSR osnewl
 
-    ; YOUR MOVE prompt (only when it's the human's turn)
+    ; Turn indicator: "YOUR MOVE" for human, "CPU P2/P3/P4" for AI
     LDA current_player
-    BNE gd_move_dn
+    BEQ gd_human_move
+    ; CPU player — print "CPU P" then player number + 2 as ASCII digit
+    LDY #0
+.gd_cpu_move_lp
+    LDA cpu_move_str, Y
+    BEQ gd_cpu_num    ; end of "CPU P" prefix
+    JSR oswrch: INY
+    JMP gd_cpu_move_lp
+.gd_cpu_num
+    LDA current_player
+    CLC: ADC #'2'     ; P2=1+2, P3=2+2, P4=3+2
+    JSR oswrch
+    JMP gd_move_dn
+.gd_human_move
     LDY #0
 .gd_move_lp
     LDA your_move_str, Y
@@ -5754,6 +5767,9 @@ ORG &3000
 
 .inst_str
     EQUS "Z-M,A-J discard   Q:quit", 0
+
+.cpu_move_str
+    EQUS "CPU P", 0
 
 .your_move_str
     EQUS "YOUR MOVE", 0
