@@ -1760,8 +1760,8 @@ ORG &3000
     BNE cwi_count
     RTS
 .cwi_error
-    ; Corruption detected — set breakpoint here in BeebEm debugger
-    NOP
+    ; Corruption detected — BRK triggers BeebEm debugger
+    BRK
 
 ; Discard tile at position X (0-based) for current player
 .player_discard
@@ -2936,10 +2936,10 @@ ORG &3000
     SEC: SBC #10: INX: JMP wc10
 .wc10dn
     ; DEBUG: trap if wall count digits out of range (indicates data corruption)
-    CPX #10: BCC wc_tens_ok: NOP  ; tens digit >= 10 = corruption
+    CPX #10: BCC wc_tens_ok: BRK  ; tens digit >= 10 = corruption
 .wc_tens_ok
     PHA
-    CMP #10: BCC wc_units_ok: NOP ; units digit >= 10 = corruption
+    CMP #10: BCC wc_units_ok: BRK ; units digit >= 10 = corruption
 .wc_units_ok
     TXA: CLC: ADC #'0': JSR oswrch
     PLA: CLC: ADC #'0': JSR oswrch
