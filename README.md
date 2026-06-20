@@ -12,8 +12,8 @@ This game was developed entirely by AI tools. The 6502 assembly source code, gam
 
 1. Load the disc image `mahjong.ssd` in a BBC Micro emulator (such as BeebEm or beebjit)
 2. The game boots to a title screen — press any key to continue through the information pages
-3. Select Practice Mode (ON or OFF)
-4. Select a difficulty level for the three AI opponents (Novice, Intermediate, or Expert)
+3. Select a difficulty level for the three AI opponents (Novice, Intermediate, or Expert)
+4. Select Practice Mode (ON or OFF)
 5. The first hand is dealt and you play as Player 1 (East)
 
 ### Gameplay
