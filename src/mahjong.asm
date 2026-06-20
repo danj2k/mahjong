@@ -2879,7 +2879,19 @@ ORG &3000
 .gd_wall_dn
     LDA #DORA_START
     SEC: SBC wall_pos
-    ; Print as 2-digit decimal
+    ; Print as up to 3-digit decimal (max 122)
+    ; Hundreds digit
+    LDX #0
+.wc100
+    CMP #100: BCC wc100dn
+    SEC: SBC #100: INX: JMP wc100
+.wc100dn
+    PHA
+    TXA: BEQ wc_no_hun       ; skip leading zero
+    CLC: ADC #'0': JSR oswrch
+.wc_no_hun
+    PLA
+    ; Tens digit
     LDX #0
 .wc10
     CMP #10: BCC wc10dn
