@@ -153,6 +153,7 @@ ORG &3000
     JSR advance_player
     JMP mainloop
 .ml_tsumo_valid
+    LDX current_player
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -171,6 +172,7 @@ ORG &3000
     JMP ml_skip_draw
 
 .ml_not_tsumo
+    LDX current_player
     JSR sort_hand
     JSR game_display
     JSR check_closed_kan
@@ -185,6 +187,7 @@ ORG &3000
     JMP ml_abortive
 .ml_no_abort_k
     ; Refresh screen after kan — hand has changed (4 tiles removed, 1 drawn)
+    LDX current_player
     JSR sort_hand
     JSR game_display
     JMP ml_got_tile
@@ -300,6 +303,7 @@ ORG &3000
 .nine_gates_ok
     JMP mainloop
 .ml_not_nine_gates
+    LDX current_player
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -329,6 +333,7 @@ ORG &3000
     JSR advance_player
     JMP mainloop
 .ml_ron_valid
+    LDX current_player
     JSR sort_hand
     JSR game_display
     JSR calculate_score
@@ -1755,8 +1760,8 @@ ORG &3000
     BNE cwi_count
     RTS
 .cwi_error
-    ; Corruption detected — hang for debugger inspection
-    BRK
+    ; Corruption detected — set breakpoint here in BeebEm debugger
+    NOP
 
 ; Discard tile at position X (0-based) for current player
 .player_discard
@@ -2931,10 +2936,10 @@ ORG &3000
     SEC: SBC #10: INX: JMP wc10
 .wc10dn
     ; DEBUG: trap if wall count digits out of range (indicates data corruption)
-    CPX #10: BCC wc_tens_ok: BRK  ; tens digit >= 10 = corruption
+    CPX #10: BCC wc_tens_ok: NOP  ; tens digit >= 10 = corruption
 .wc_tens_ok
     PHA
-    CMP #10: BCC wc_units_ok: BRK ; units digit >= 10 = corruption
+    CMP #10: BCC wc_units_ok: NOP ; units digit >= 10 = corruption
 .wc_units_ok
     TXA: CLC: ADC #'0': JSR oswrch
     PLA: CLC: ADC #'0': JSR oswrch
