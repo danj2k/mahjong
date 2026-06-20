@@ -906,10 +906,12 @@ ORG &3000
     ; Display riichi prompt
     JSR riichi_display_prompt
 
-    ; Read Y key to declare riichi
+    ; Read Y/N key to declare riichi
     JSR osrdch
     CMP #'Y': BEQ crh_declare
     CMP #'y': BEQ crh_declare
+    ; User said no — clear prompt immediately
+    JSR clear_prompt_line
 
 .crh_no
     CLC: RTS
@@ -1163,11 +1165,12 @@ ORG &3000
     LDA tmp9: JSR tile_num_char: JSR oswrch
     LDA tmp9: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for Y key to declare kan
+    ; Wait for Y/N key to declare kan
     JSR osrdch
     CMP #'Y': BEQ cck_do_it
     CMP #'y': BEQ cck_do_it
-    ; User said no - set flag and continue scanning for other kans
+    ; User said no — clear prompt, set flag, continue scanning
+    JSR clear_prompt_line
     LDA #1: STA kan_declined
     LDY tmp9
     JMP cck_next    ; Y = tmp9, then INY + JMP cck_scan
@@ -1326,10 +1329,12 @@ ORG &3000
     LDA tmp8: JSR tile_num_char: JSR oswrch
     LDA tmp8: JSR tile_suit_char: JSR oswrch
     LDA #' ': JSR oswrch
-    ; Wait for Y key to declare kan
+    ; Wait for Y/N key to declare kan
     JSR osrdch
     CMP #'Y': BEQ cak_do_it
     CMP #'y': BEQ cak_do_it
+    ; User said no — clear prompt and continue scanning
+    JSR clear_prompt_line
     JMP cak_next
 
 .cak_do_it
@@ -2203,6 +2208,8 @@ ORG &3000
     JSR osrdch
     CMP #'Y': BEQ shp_yes
     CMP #'y': BEQ shp_yes
+    ; User said no — clear prompt before returning
+    JSR clear_prompt_line
     CLC: RTS
 .shp_yes
     SEC: RTS
@@ -2220,6 +2227,8 @@ ORG &3000
     JSR osrdch
     CMP #'Y': BEQ shc_yes
     CMP #'y': BEQ shc_yes
+    ; User said no — clear prompt before returning
+    JSR clear_prompt_line
     CLC: RTS
 .shc_yes
     SEC: RTS
@@ -2237,6 +2246,8 @@ ORG &3000
     JSR osrdch
     CMP #'Y': BEQ shk_yes
     CMP #'y': BEQ shk_yes
+    ; User said no — clear prompt before returning
+    JSR clear_prompt_line
     CLC: RTS
 .shk_yes
     SEC: RTS
