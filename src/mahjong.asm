@@ -5799,7 +5799,7 @@ ORG &3000
     EQUS "FURITEN!", 0
 
 .drawn_str
-    ; EQUS "DRAW - Wall Exhausted", 0
+    EQUS "DRAW - Wall Exhausted", 0
 
     .diff_title
         EQUS "RIICHI MAHJONG - Select Difficulty", 0
