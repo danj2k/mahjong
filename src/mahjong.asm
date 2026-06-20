@@ -1710,6 +1710,7 @@ ORG &3000
 
 ; Draw a tile for current player
 .player_draw
+    JSR check_wall_integrity   ; verify wall hasn't been corrupted
     LDX current_player
     LDA num_tiles, X
     CMP #HAND_SIZE: BCS pd_fail
@@ -1727,6 +1728,35 @@ ORG &3000
     CLC: RTS
 .pd_fail
     SEC: RTS
+
+; Verify wall integrity: count all tile types in wall[0..DORA_START-1]
+; Each tile type must appear exactly 4 times. BRK if corruption detected.
+; Destroys A, X, Y.
+.check_wall_integrity
+    ; Zero the count buffer
+    LDX #0
+    TXA
+.cwi_zero
+    STA wall_check_counts, X
+    INX
+    CPX #TILE_TYPES
+    BNE cwi_zero
+    ; Count each tile in the full wall array (Y = wall index)
+    LDY #0
+.cwi_count
+    LDA wall, Y
+    TAX                        ; tile type → X for count buffer index
+    INC wall_check_counts, X
+    LDA wall_check_counts, X
+    CMP #5
+    BEQ cwi_error
+    INY
+    CPY #DORA_START
+    BNE cwi_count
+    RTS
+.cwi_error
+    ; Corruption detected — hang for debugger inspection
+    BRK
 
 ; Discard tile at position X (0-based) for current player
 .player_discard
@@ -6429,6 +6459,10 @@ ORG &3000
     EQUB 9, &9D, &91, &20, &6A, &35, &20, &20, &20, &9C
     EQUB 9, &9D, &91, &20, &6A, &25, &20, &20, &20, &9C
     EQUB 9, &9D, &91, &20, &20, &20, &20, &20, &20, &9C
+
+    ; 34-byte buffer for wall integrity check (zeroed on each check)
+.wall_check_counts
+    EQUB 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .end
 SAVE "MAHJONG", start, end, start
