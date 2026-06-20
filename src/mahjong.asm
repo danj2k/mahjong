@@ -6205,7 +6205,7 @@ ORG &3000
 ; ============================================================
 
 .splash_text
-    EQUS "             RIICHI MAHJONG"
+    EQUS "            RIICHI MAHJONG"
     EQUB 10
     EQUS "           BBC Micro Edition"
     EQUB 10, 10
