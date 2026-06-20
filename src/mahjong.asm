@@ -66,7 +66,7 @@ skip_draw = &8E
 
 ; Last discarded tile info
 disc_tile_val = &8F
-disc_tile_player = &90
+; disc_tile_player is in data section (was at &90 Econet zone — unsafe)
 
 ; Flag set when human declines closed kan prompt
 ; kan_declined is in the data section (after player_kans)
@@ -110,6 +110,7 @@ ORG &3000
     BCC ml_draw_ok    ; if player_draw returned carry clear (OK/false)
     ; Wall exhausted - drawn game
     JSR game_display
+    JSR osnewl
     LDY #0
 .draw_msg
     LDA drawn_str, Y
@@ -1730,6 +1731,10 @@ ORG &3000
     JSR set_hand_ptr
     LDY tmp
     LDA (ptr), Y
+    ; Save discarded tile info for open call checking (pon/chii/kan prompts)
+    STA disc_tile_val
+    LDX current_player
+    STX disc_tile_player
     PHA
     LDX current_player
     JSR set_disc_ptr
@@ -5983,6 +5988,9 @@ ORG &3000
 
 ; Flag set when human declines closed kan prompt (cleared on new round)
 .kan_declined EQUB 0
+
+; Player who made the last discard (for open call checking)
+.disc_tile_player EQUB 0
 
 ; Chombo penalty tracking
 .chombo_count
