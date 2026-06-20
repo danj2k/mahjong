@@ -105,7 +105,9 @@ ORG &3000
 .mainloop
     LDA #0: STA tsumo_flag: STA ron_flag
     LDA skip_draw
-    BNE ml_do_skip       ; skip if flag set (forward branch, within range)
+    BEQ ml_no_skip       ; skip if flag NOT set (forward branch, within range)
+    JMP ml_do_skip
+.ml_no_skip
     JSR player_draw
     BCC ml_draw_ok    ; if player_draw returned carry clear (OK/false)
     ; Wall exhausted - drawn game
@@ -153,6 +155,7 @@ ORG &3000
     JSR advance_player
     JMP mainloop
 .ml_tsumo_valid
+    INC dbg_tsumo_wins
     LDX current_player
     JSR sort_hand
     JSR game_display
@@ -190,6 +193,9 @@ ORG &3000
     LDX current_player
     JSR sort_hand
     JSR game_display
+    ; Check for tsumo after kan replacement draw — player may have won
+    JSR check_tsumo
+    BCS ml_tsumo_valid    ; win by tsumo after kan
     JMP ml_got_tile
 .ml_no_kan
     ; Check riichi for human player
@@ -318,6 +324,7 @@ ORG &3000
     JMP mainloop
 
 .ml_ron
+    INC dbg_ron_wins
     ; Check for triple ron before handling
     JSR check_triple_ron
     BCC ml_not_triple_ron    ; if check_triple_ron returned carry clear (OK/false)
@@ -4771,6 +4778,7 @@ ORG &3000
 ; =============================================
 
 .check_tsumo
+    INC dbg_tsumo_calls
     JSR check_win
     BCS cts_win    ; if check_win returned carry set (error/true)
     CLC: RTS
@@ -4780,6 +4788,7 @@ ORG &3000
     SEC: RTS
 
 .check_ron
+    INC dbg_ron_calls
     LDX #0
 .cr_loop
     STX tmp5
@@ -6149,6 +6158,16 @@ ORG &3000
     FOR I, 0, 33
     EQUB 0
     NEXT
+
+; Debug counters (for diagnosing win detection)
+.dbg_tsumo_calls
+    EQUB 0
+.dbg_tsumo_wins
+    EQUB 0
+.dbg_ron_calls
+    EQUB 0
+.dbg_ron_wins
+    EQUB 0
 
 
 ; ============================================================
