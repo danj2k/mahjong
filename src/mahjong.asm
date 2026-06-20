@@ -2919,10 +2919,7 @@ ORG &3000
     TAX
     PLA                     ; A=high, X=low
     JSR print_num16
-    ; Separator between players (indicator + 3 spaces)
-    LDA tmp5
-    CMP #NUM_PLAYERS-1    ; last player?
-    BEQ dpl_done    ; skip separator after last player
+    ; Indicator between players (F/R/C/space + 3 spaces)
     LDY tmp5
     LDA furiten_flags, Y
     BEQ dpl_no_furi    ; not furiten - check riichi
