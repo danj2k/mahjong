@@ -5887,13 +5887,13 @@ ORG &3000
     EQUS "Declare Added Kan? (Y/N)", 0
 
 .pon_ask_str
-    EQUS "Pon? (Y/N)", 0
+    EQUS "Declare Pon? (Y/N)", 0
 
 .chii_ask_str
-    EQUS "Chii? (Y/N)", 0
+    EQUS "Declare Chii? (Y/N)", 0
 
 .kan_ask_str
-    EQUS "Kan? (Y/N)", 0
+    EQUS "Declare Kan? (Y/N)", 0
 
 .press_key_str
     EQUS "Press any key...", 0
