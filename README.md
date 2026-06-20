@@ -247,7 +247,7 @@ beebasm -i src/mahjong.asm -boot MAHJONG -do build/mahjong.ssd
 cd src && beebasm -i mahjong.asm -boot MAHJONG -o ../build/MAHJONG -do ../build/mahjong.ssd
 ```
 
-### 🎮 Controls
+### ⌨️ Controls
 
 | Key | Action |
 |-----|--------|
