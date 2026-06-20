@@ -31,7 +31,7 @@ Each hand begins with 13 tiles dealt to each player. On your turn you draw one t
 
 ### Winning
 
-A winning hand consists of **4 melds and 1 pair** (14 tiles total), or **7 pairs** (Chiitoitsu). There are two ways to win:
+A winning hand consists of **4 [melds](#melds) and 1 pair** (14 tiles total), or **7 pairs** (Chiitoitsu). There are two ways to win:
 
 - **Tsumo** — draw the winning tile yourself
 - **Ron** — claim a tile discarded by any opponent
@@ -159,7 +159,7 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 |------|----------|---------|
 | Riichi | 立直 | "Standing straight" — a declaration that you are one tile from winning; locks your hand and discards |
 | Ippatsu | 一発 | "One shot" — winning within one full rotation after declaring riichi |
-| Menzen Tsumo | 門前自摸 | "Closed门前 self-draw" — winning by drawing the last tile yourself with a closed hand |
+| Menzen Tsumo | 門前自摸 | "Closed hand self-draw" — winning by drawing the last tile yourself with a closed hand |
 | Tanyao | 断幺九 | "Broken terminals" — a hand with only simples (tiles 2–8), no terminals or honors |
 | Pinfu | 平和 | "Flat hand" — all sequences in a closed hand, pair is not yakuhai, and the winning wait is a two-sided sequence wait |
 | Iipeiko | 一盃口 | "One cup" — two identical sequences in the same suit (closed only) |
