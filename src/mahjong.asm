@@ -1213,8 +1213,11 @@ ORG &3000
     TXA: ASL A: ASL A: ASL A: ASL A
     CLC: ADC tmp6: STA tmp6   ;\ tmp6 = player * 20
     LDY opn_count, X
-    TYA: ASL A: ASL A: CLC: ADC tmp6
-    TAX                      ;\ X = offset into opn_melds
+    STY tmp7             ;\ save count for *5 calculation
+    TYA: ASL A: ASL A    ;\ * 4
+    CLC: ADC tmp7         ;\ + count = * 5
+    CLC: ADC tmp6         ;\ + player * 20
+    TAX                   ;\ X = offset into opn_melds
     ; Store meld: type 3 (closed kan), tile1, tile2, tile3, tile4
     LDA #3: STA opn_melds, X
     LDA tmp5
