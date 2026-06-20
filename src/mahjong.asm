@@ -2218,6 +2218,11 @@ ORG &3000
     JSR oswrch: INY
     JMP shp_lp
 .shp_dn
+    ; Show which tile was discarded
+    LDA #' ': JSR oswrch
+    LDA disc_tile_val: JSR tile_num_char: JSR oswrch
+    LDA disc_tile_val: JSR tile_suit_char: JSR oswrch
+    LDA #' ': JSR oswrch
     JSR osrdch
     CMP #'Y': BEQ shp_yes
     CMP #'y': BEQ shp_yes
@@ -2237,6 +2242,11 @@ ORG &3000
     JSR oswrch: INY
     JMP shc_lp
 .shc_dn
+    ; Show which tile was discarded
+    LDA #' ': JSR oswrch
+    LDA disc_tile_val: JSR tile_num_char: JSR oswrch
+    LDA disc_tile_val: JSR tile_suit_char: JSR oswrch
+    LDA #' ': JSR oswrch
     JSR osrdch
     CMP #'Y': BEQ shc_yes
     CMP #'y': BEQ shc_yes
@@ -2256,6 +2266,11 @@ ORG &3000
     JSR oswrch: INY
     JMP shk_lp
 .shk_dn
+    ; Show which tile was discarded
+    LDA #' ': JSR oswrch
+    LDA disc_tile_val: JSR tile_num_char: JSR oswrch
+    LDA disc_tile_val: JSR tile_suit_char: JSR oswrch
+    LDA #' ': JSR oswrch
     JSR osrdch
     CMP #'Y': BEQ shk_yes
     CMP #'y': BEQ shk_yes
@@ -5801,7 +5816,7 @@ ORG &3000
     EQUS "Chii? (Y/N)", 0
 
 .kan_ask_str
-    EQUS "Kan? (K)", 0
+    EQUS "Kan? (Y/N)", 0
 
 .press_key_str
     EQUS "Press any key...", 0
