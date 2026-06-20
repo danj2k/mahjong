@@ -118,6 +118,14 @@ ORG &3000
     JMP draw_msg
 .draw_msg_dn
     JSR osnewl
+    ; Show "Press any key to continue"
+    LDY #0
+.pak_drawn
+    LDA press_any_key_str, Y: BEQ pak_drawn_dn
+    JSR oswrch: INY: JMP pak_drawn
+.pak_drawn_dn
+    ; Wait for keypress
+    JSR osrdch
     ; Drawn game: dealer stays, honba++, hands_played++
     INC honba: INC hands_played
     ; Check game end
