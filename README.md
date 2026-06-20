@@ -21,7 +21,7 @@ This game was developed entirely by AI tools. The 6502 assembly source code, gam
 Each hand begins with 13 tiles dealt to each player. On your turn you draw one tile (14 total), then discard one tile to return to 13. The game continues clockwise until someone wins or the wall is exhausted.
 
 **Your turn:**
-- Your tiles are displayed in order from left to right. To discard a tile, press the letter corresponding to its position: **Z** through **M** (bottom row of a QWERTY keyboard) for tiles 1–13, then **A** through **J** (middle row) for tiles 14–23
+- Your tiles are displayed in order from left to right. To discard a tile, press the letter corresponding to its position: **Z** to **M** (bottom row of a QWERTY keyboard) for positions 1 to 7, then **A** to **J** (middle row) for positions 8 to 14
 - If Practice Mode is on, the game will suggest the best discard — press the key shown to discard that tile
 - Press **Q** to quit the game
 
