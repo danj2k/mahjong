@@ -2897,7 +2897,12 @@ ORG &3000
     CMP #10: BCC wc10dn
     SEC: SBC #10: INX: JMP wc10
 .wc10dn
+    ; DEBUG: trap if wall count digits out of range (indicates data corruption)
+    CPX #10: BCC wc_tens_ok: BRK  ; tens digit >= 10 = corruption
+.wc_tens_ok
     PHA
+    CMP #10: BCC wc_units_ok: BRK ; units digit >= 10 = corruption
+.wc_units_ok
     TXA: CLC: ADC #'0': JSR oswrch
     PLA: CLC: ADC #'0': JSR oswrch
     ; Print dealer wind
@@ -6115,6 +6120,12 @@ ORG &3000
 .show_splash
     ; Clear screen
     LDA #12: JSR oswrch
+    ; Draw mahjong tile at top of screen (rows 2-9, centred)
+    JSR draw_tile_image
+    ; Position cursor for splash text (row 12)
+    LDA #31: JSR oswrch
+    LDA #0: JSR oswrch
+    LDA #12: JSR oswrch
     ; Print splash text
     LDA #<splash_text: STA ptr
     LDA #>splash_text: STA ptr+1
@@ -6194,10 +6205,9 @@ ORG &3000
 ; ============================================================
 
 .splash_text
-    EQUB 10, 10
     EQUS "         RIICHI MAHJONG"
     EQUB 10
-    EQUS "       BBC Micro Edition"
+    EQUS "        BBC Micro Edition"
     EQUB 10, 10
     EQUS "   Press I for Instructions"
     EQUB 10
@@ -6378,6 +6388,44 @@ ORG &3000
     EQUS "  Press any key to exit"
     EQUB 10, 0
 
+
+.draw_tile_image
+    ; Draw Red Dragon tile centred at top of screen
+    ; Y = screen row (starts at 2), tmp3 = data offset
+    LDY #2
+    LDX #0
+    STX tmp3
+.dt_row
+    LDA #31: JSR oswrch  ; VDU 31,x,y
+    LDA #15: JSR oswrch  ; column 15 (centred for 9-col tile)
+    TYA: JSR oswrch      ; row
+    LDX tmp3
+    LDA tile_data, X     ; row byte count
+    STA tmp2
+.dt_loop
+    INX
+    LDA tile_data, X
+    JSR oswrch
+    DEC tmp2
+    BNE dt_loop
+    INX                  ; skip end marker (&9C)
+    STX tmp3
+    INY                  ; next row
+    CPY #10              ; 8 rows: 2-9
+    BNE dt_row
+    RTS
+
+.tile_data
+    ; Red Dragon mahjong tile (8 rows, 9 bytes each)
+    ; Row format: length, &9D, &91, graphics..., &9C
+    EQUB 9, &9D, &91, &20, &20, &20, &20, &20, &20, &9C
+    EQUB 9, &9D, &91, &20, &6A, &34, &70, &20, &20, &9C
+    EQUB 9, &9D, &91, &7C, &6F, &3F, &6B, &20, &20, &9C
+    EQUB 9, &9D, &91, &35, &7A, &7D, &2F, &20, &20, &9C
+    EQUB 9, &9D, &91, &2F, &6B, &35, &20, &20, &20, &9C
+    EQUB 9, &9D, &91, &20, &6A, &35, &20, &20, &20, &9C
+    EQUB 9, &9D, &91, &20, &6A, &25, &20, &20, &20, &9C
+    EQUB 9, &9D, &91, &20, &20, &20, &20, &20, &20, &9C
 
 .end
 SAVE "MAHJONG", start, end, start
