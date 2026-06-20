@@ -1601,15 +1601,17 @@ ORG &3000
     RTS
 
 .rng
-    ; 8-bit XOR-shift PRNG: period 255, no non-zero fixed points
-    ; Replaces LCG (seed*5+7) which had fixed point at &BE
-    ; causing wall_shuffle infinite loop in BeebEm
+    ; 8-bit LCG PRNG: seed = (seed * 5 + 7) mod 256
+    ; Full period 256 (Hull-Dobell: gcd(7,256)=1, 5-1=4 div by 2 and 4)
+    ; Previous xorshift had period only 15 - wall shuffles repeated every 4 hands
     LDA rng_seed
-    ASL A
-    EOR rng_seed
-    STA rng_seed
-    LSR A
-    EOR rng_seed
+    STA tmp            ; save seed
+    ASL A              ; A = 2*seed
+    ASL A              ; A = 4*seed
+    CLC
+    ADC tmp            ; A = 5*seed
+    CLC
+    ADC #7             ; A = 5*seed + 7
     STA rng_seed
     RTS
 
@@ -5669,6 +5671,12 @@ ORG &3000
     LDA #'t': JSR oswrch
     LDA #'s': JSR oswrch
     JSR osnewl
+    ; Show "Press any key to continue"
+    LDY #0
+.apc_key_msg
+    LDA press_any_key_str, Y: BEQ apc_key_msg_dn
+    JSR oswrch: INY: JMP apc_key_msg
+.apc_key_msg_dn
     ; Wait for keypress
     JSR osrdch
     RTS
