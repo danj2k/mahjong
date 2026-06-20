@@ -31,7 +31,7 @@ Each hand begins with 13 tiles dealt to each player. On your turn you draw one t
 
 ### 🏆 Winning
 
-A winning hand consists of **4 [melds](#melds) and 1 pair** (14 tiles total), or **7 pairs** (Chiitoitsu). There are two ways to win:
+A winning hand consists of **4 [melds](#-melds) and 1 pair** (14 tiles total), or **7 pairs** (Chiitoitsu). There are two ways to win:
 
 - **Tsumo** — draw the winning tile yourself
 - **Ron** — claim a tile discarded by any opponent
