@@ -4177,17 +4177,15 @@ ORG &3000
     ; Found sequence in man (Y-2, Y-1, Y)
     ; Check pin (Y+7, Y+8, Y+9)
     TYA: CLC: ADC #7: TAX
-    LDA tile_counts, X: BEQ cs_no_seq
-    INX: LDA tile_counts, X: BEQ cs_no_seq
-    INX: LDA tile_counts, X: BEQ cs_no_seq
+    LDA tile_counts, X: BEQ cs_next3
+    INX: LDA tile_counts, X: BEQ cs_next3
+    INX: LDA tile_counts, X: BEQ cs_next3
     ; Check sou (Y+16, Y+17, Y+18)
     TYA: CLC: ADC #16: TAX
-    LDA tile_counts, X: BEQ cs_no_seq
-    INX: LDA tile_counts, X: BEQ cs_no_seq
-    INX: LDA tile_counts, X: BEQ cs_no_seq
+    LDA tile_counts, X: BEQ cs_next3
+    INX: LDA tile_counts, X: BEQ cs_next3
+    INX: LDA tile_counts, X: BEQ cs_next3
     SEC: RTS
-.cs_no_seq
-    DEY
 .cs_next3
     DEY
 .cs_next2
