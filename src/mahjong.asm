@@ -1010,10 +1010,10 @@ ORG &3000
     BEQ cra_open_ok       ; hand is closed: proceed
     JMP cra_no            ; open hand: can't riichi
 .cra_open_ok
-    ; Novice: always riichi if eligible
+    ; Novice: never declare riichi
     LDA ai_difficulty
     BNE cra_not_novice
-    JMP cra_enough
+    JMP cra_no
 .cra_not_novice
 
     ; Intermediate/Expert: evaluate hand strength before riichi

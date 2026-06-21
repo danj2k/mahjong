@@ -97,7 +97,7 @@ The game uses 136 tiles — 4 copies of each of 34 distinct tiles:
 
 ### 🎯 Riichi
 
-When your hand is **one tile away from winning** (tenpai) and your hand is closed, you may declare riichi. This costs 1000 points from your score and locks in your discards — you must discard the tile you draw each turn without changing your hand. If you win while in riichi, you score bonus points. Ippatsu (winning within one full rotation of declaring riichi) adds an extra bonus.
+When your hand is **one tile away from winning** (tenpai) and your hand is closed, you may declare riichi. This costs 1000 points from your score and **locks your hand** — you cannot change which tiles you hold or make any open calls (pon, chii, or kan). You must discard the tile you draw each turn. If you win while in riichi, you score bonus points. Ippatsu (winning within one full rotation of declaring riichi) adds an extra bonus.
 
 ### ⏸️ Abortive Draws
 
@@ -158,7 +158,7 @@ Base points = fu × 2^(2+han). The score is then adjusted based on who wins and 
 
 | Yaku | Japanese | Meaning |
 |------|----------|---------|
-| Riichi | 立直 | "Standing straight" — a declaration that you are one tile from winning; locks your hand and discards |
+| Riichi | 立直 | "Standing straight" — a declaration that you are one tile from winning; locks your hand and prevents open calls |
 | Ippatsu | 一発 | "One shot" — winning within one full rotation after declaring riichi |
 | Menzen Tsumo | 門前自摸 | "Closed hand self-draw" — winning by drawing the last tile yourself with a closed hand |
 | Tanyao | 断幺九 | "Broken terminals" — a hand with only simples (tiles 2–8), no terminals or honors |
