@@ -908,20 +908,24 @@ ORG &3000
 ;   temporarily add disc_tile_val to tile_counts before check_win,
 ;   then restore it afterwards.
 .check_chombo_win
+    ; Build tile counts from current player's hand first
+    JSR build_tile_counts
     LDA tsumo_flag: BNE ccmw_tsumo
-    ; Ron path — add discarded tile to tile_counts for check_win
-    LDY disc_tile_val
-    LDA tile_counts, Y: PHA: CLC: ADC #1: STA tile_counts, Y
-    JSR check_win
+    ; Ron path — the discarded tile is NOT in the hand, so add it
+    ; to tile_counts before checking for a winning decomposition
+    LDY disc_tile_val: TYA: TAX
+    LDA tile_counts, X: CLC: ADC #1: STA tile_counts, X
+    JSR check_win_no_rebuild
     ; Restore tile_counts
-    LDY disc_tile_val: PLA: STA tile_counts, Y
-    BCS ccmw_valid    ; if check_win returned carry set (error/true)
+    LDY disc_tile_val: TYA: TAX
+    LDA tile_counts, X: SEC: SBC #1: STA tile_counts, X
+    BCS ccmw_valid    ; if check_win_no_rebuild found a win
     ; Invalid win = chombo
     SEC: RTS
 .ccmw_tsumo
-    ; Tsumo path — drawn tile is already in hand, check_win works directly
+    ; Tsumo path — drawn tile IS already in the hand, check_win works
     JSR check_win
-    BCS ccmw_valid    ; if check_win returned carry set (error/true)
+    BCS ccmw_valid    ; if check_win found a win
     ; Invalid win = chombo
     SEC: RTS
 .ccmw_valid
