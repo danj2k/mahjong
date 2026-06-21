@@ -137,4 +137,32 @@ JMP ai_done              ; only jumps when Y == tmp7
 
 **Impact:** Low in practice — seven pairs is a rare winning pattern, so the bug was unlikely to trigger during normal play. But it would cause unpredictable behaviour whenever seven pairs was the winning hand.
 
+## Chii Skip Draw Bug (Hand Inflation)
+
+**Problem:** After making a chii (sequence claim), the calling player received a free extra draw before discarding. With 4 chiis, the hand had 6 tiles instead of the correct 4.
+
+**Root cause:** The `ep_add_chii` routine intentionally did NOT set `skip_draw`:
+```asm
+; BEFORE (broken):
+; Chii is always open - allow normal draw (don't set skip_draw)
+RTS
+
+; AFTER (fixed):
+; After chii, player must discard without drawing
+LDA #1
+STA skip_draw
+RTS
+```
+
+In Mahjong, after ANY open call (pon, chii, or kan), the calling player discards without drawing. Pon and kan correctly set `skip_draw = 1`, but chii did not — the old comment ("allow normal draw") was a misunderstanding of the rules.
+
+**Impact:** Each chii inflated the hand by 1 tile. With 4 chiis:
+- Correct: 13 - 3*4 = 1 tile in hand (after melds + discards)
+- Buggy: 13 - 2*4 = 5 tiles in hand
+
+The extra tiles distorted AI hand evaluation, made win detection less likely (incorrect hand shapes), and was visible as too many tiles in the hand display.
+
+**Discovery:** User reported 6 tiles in hand with 4 open melds displayed on screen. Standard Mahjong dictates 13 - 2*4 = 5 tiles after 4 chiis (at discard point), or 4 tiles after the discard. 6 tiles indicated an extra draw per chii.
+
+**Fix:** Added `skip_draw = 1` in `ep_add_chii`, matching the existing pon and kan code paths.
 **Discovery method:** Code review of `check_win` traced the stack operations through both win paths. The pair-loop path correctly pushes/pops X; the seven pairs path shares `cw_win` but has no matching push.
