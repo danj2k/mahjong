@@ -116,7 +116,7 @@ The core win detection algorithm:
 
 ### 17. Ron Detection (~lines 4600–4700)
 
-`check_ron` iterates over non-discarder players, adds the discarded tile to their tile counts, and calls `check_win_no_rebuild`.
+`check_ron` iterates over non-discarder players, adds the discarded tile to their tile counts, and calls `check_win_no_rebuild`. The `tsumo_flag` (ZP `&80`) is set before calling `check_chombo_win` to distinguish tsumo from ron — for ron, `check_chombo_win` must temporarily add `disc_tile_val` to tile_counts before calling `check_win`, since the discarded tile is not in the hand array.
 
 ### 18. Riichi Logic (~lines 4700–4900)
 

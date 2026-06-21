@@ -97,3 +97,13 @@ JMP ai_done              ; only jumps when Y == tmp7
 **Problem:** When multiple kans were available, each prompt appeared below the previous one, cluttering the screen.
 
 **Fix:** Added `clear_prompt_line` which positions at row 24, clears 39 spaces (not 40 — 40 would cause Mode 7 scrolling), then repositions. All prompt routines now use this instead of `osnewl`, so each prompt overwrites the previous one.
+
+## Ron Win Detection Rejected by Chombo Check
+
+**Problem:** `dbg_ron_wins` showed 1 but no winner screen appeared — the game showed "Wall Exhausted" instead.
+
+**Root cause:** `check_chombo_win` is called after both Tsumo and Ron detections to verify the win is valid. It calls `check_win`, which rebuilds `tile_counts` from the hand array via `build_tile_counts`. For Tsumo, the drawn tile IS in the hand, so the rebuild works correctly. For Ron, the discarded tile is NOT in the hand — it's in the discard pile — so `check_win` finds no win and `check_chombo_win` returns carry set (invalid win = chombo). The ron win was detected correctly by `check_ron`, then immediately rejected by `check_chombo_win`.
+
+**Fix:** `check_chombo_win` now checks `tsumo_flag`. For Tsumo, it calls `check_win` directly (drawn tile is in hand). For Ron, it temporarily adds `disc_tile_val` to `tile_counts` before calling `check_win`, then restores it afterwards.
+
+**Discovery method:** BeebEm debugger watches showed `dbg_ron_wins = 1` but no winner screen appeared. Traced the code flow from `check_ron` through `check_chombo_win` to find the rejection.

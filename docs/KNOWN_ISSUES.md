@@ -4,9 +4,9 @@
 
 **Status:** Likely the primary remaining issue
 
-The AI discard logic scores tiles based on connectivity (pairs, sequences, gaps) but does not evaluate hand value or tenpai state. With the recent outer-loop fix, the AI now evaluates all tiles in its hand, but the scoring heuristics may still be too basic to consistently build winning hands. Debug counters from gameplay show 70+ tsumo checks with 0 wins, suggesting the AI is not progressing toward winning hands efficiently.
+The AI discard logic scores tiles based on connectivity (pairs, sequences, gaps) but does not evaluate hand value or tenpai state. With the outer-loop fix and the Ron detection fix, wins can now occur (debug counters showed `dbg_ron_wins = 1` in a recent game), but they are rare. The AI scoring heuristics are still too basic to consistently build winning hands within the 70-tile wall limit.
 
-**Impact:** Games frequently end in wall exhaustion with no winner.
+**Impact:** Most games end in wall exhaustion with no winner. Wins do occur but are uncommon.
 
 **Suggested improvement:** Implement a tenpai check in the AI — after each discard, check if the hand is one tile away from winning. If so, keep the hand in tenpai and only discard drawn tiles that don't complete the hand. This would dramatically improve the AI's ability to win.
 
@@ -64,6 +64,6 @@ The current build includes debug counters (`dbg_tsumo_calls`, `dbg_tsumo_wins`, 
 
 ## Wall Corruption (Investigating)
 
-**Status:** Under investigation
+**Status:** Likely resolved
 
-Memory dumps showed the wall array contained 5 copies of 1m and 1s, with only 3 copies of Nw and Cr. This suggests two wall positions were overwritten during gameplay. BRK-based debug traps have been added at the wall integrity check and wall count display to catch this at the source if it recurs. The sort_hand fix may have resolved this, as it was the most likely source of random memory writes.
+Memory dumps showed the wall array contained 5 copies of 1m and 1s, with only 3 copies of Nw and Cr. This was caused by the sort_hand X-register clobbering bug, which wrote to random memory addresses. The fix (adding `LDX current_player` before every `JSR sort_hand` call) should have resolved this. BRK-based debug traps remain in the wall integrity check and wall count display to catch it if it recurs.
