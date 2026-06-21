@@ -2578,7 +2578,9 @@ ORG &3000
     LDA num_discards, X
     SEC: SBC #1
     STA num_discards, X
-    ; Chii is always open - allow normal draw (don't set skip_draw)
+    ; After chii, player must discard without drawing
+    LDA #1
+    STA skip_draw
     RTS
 
 ; Execute Chii: claim discarded tile with 2 from hand (sequence).
