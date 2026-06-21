@@ -2194,7 +2194,14 @@ ORG &3000
     LDX #0
 .soc_lp
     STX tmp5                 ;\ tmp5 = checking player
-    CPX tmp7: BEQ soc_skip
+    CPX tmp7: BNE soc_not_skip
+    JMP soc_skip
+.soc_not_skip
+    ; Skip if player already has max open melds (no room for more)
+    LDA opn_count, X
+    CMP #MAX_OPEN_MELDS: BCC soc_has_room
+    JMP soc_skip
+.soc_has_room
     JSR count_tiles_for_player
 
     ; Check Pon
