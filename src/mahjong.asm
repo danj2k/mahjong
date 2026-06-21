@@ -901,7 +901,25 @@ ORG &3000
 
 ; Check for illegal win (tsumo or ron)
 ; Returns C set if win declared on invalid hand
+;
+; For tsumo: the drawn tile is already in the hand, so check_win
+;   rebuilds tile_counts correctly from the hand array.
+; For ron: the discarded tile is NOT in the hand, so we must
+;   temporarily add disc_tile_val to tile_counts before check_win,
+;   then restore it afterwards.
 .check_chombo_win
+    LDA tsumo_flag: BNE ccmw_tsumo
+    ; Ron path — add discarded tile to tile_counts for check_win
+    LDY disc_tile_val
+    LDA tile_counts, Y: PHA: CLC: ADC #1: STA tile_counts, Y
+    JSR check_win
+    ; Restore tile_counts
+    LDY disc_tile_val: PLA: STA tile_counts, Y
+    BCS ccmw_valid    ; if check_win returned carry set (error/true)
+    ; Invalid win = chombo
+    SEC: RTS
+.ccmw_tsumo
+    ; Tsumo path — drawn tile is already in hand, check_win works directly
     JSR check_win
     BCS ccmw_valid    ; if check_win returned carry set (error/true)
     ; Invalid win = chombo
