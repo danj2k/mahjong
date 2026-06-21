@@ -1909,7 +1909,9 @@ ORG &3000
 
 .ai_outer
     LDY tmp3
-    CPY tmp7: JMP ai_done   ; hand exhausted, return best tile
+    CPY tmp7: BNE ai_outer_go
+    JMP ai_done              ; hand exhausted, return best tile
+.ai_outer_go
     LDA (ptr), Y
     STA tmp4                ; tmp4 = current tile being evaluated
     LDA #0: STA tmp6        ; tmp6 = score (higher = more connected = keep)
