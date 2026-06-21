@@ -604,11 +604,11 @@ ORG &3000
 .ap_dn
     RTS
 
-; AI delay - ~2.3M cycles per call
-; Triple-nested: 7 x 256 x 256 x 5 ~ 2.3M cycles
-; Three AI turns x 2.3M ~ 6.9M total > 5M type_input hold
+; AI delay - ~4M cycles per call (~2s at 2MHz)
+; Triple-nested: 12 x 256 x 256 x 5 ~ 4M cycles
+; Three AI turns x 4M ~ 12M total > 5M type_input hold
 .ai_delay
-    LDA #7
+    LDA #12
     STA tmp7
 .adl1
     LDX #0
