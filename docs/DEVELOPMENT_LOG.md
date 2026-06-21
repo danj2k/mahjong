@@ -119,3 +119,22 @@ JMP ai_done              ; only jumps when Y == tmp7
 **Fix (carry flag — e875c5d):** The first attempt had a second bug: the carry flag from `check_win_no_rebuild` was overwritten by the tile_counts restore (`SEC: SBC #1` always set carry for counts ≥ 2). This inverted the result: valid wins were rejected, invalid hands passed. Fixed by adding PHP before the restore and PLP after, preserving the carry across the restore.
 
 **Discovery method:** BeebEm debugger watches showed `dbg_ron_wins = 1` but no winner screen appeared. Traced the code flow from `check_ron` through `check_chombo_win` to find the rejection. Second bug found by code review of the restored carry flag.
+
+## check_win Seven Pairs Stack Imbalance
+
+**Problem:** If `check_seven_pairs` detected a win, `check_win` jumped to `cw_win` which did `PLA` to clean up the saved X from the pair loop. But the seven pairs path never pushed an X — the PLA popped the return address low byte, corrupting the RTS destination. This would cause erratic behaviour (crash, incorrect return, or silent corruption) whenever a seven-pairs hand was detected.
+
+**Root cause:** Both the pair-loop win path and the seven pairs win path shared the same `cw_win` label:
+```asm
+; Pair loop pushes X with TXA: PHA before JSR decompose_melds
+; cw_win does PLA to clean up — correct for pair loop
+; But check_seven_pairs never pushed anything — PLA corrupts return address
+```
+
+**Fix:** Split into two labels:
+- `cw_win` (PLA + SEC: RTS) — for pair-loop wins, cleans up the pushed X
+- `cw_win_nopair` (SEC: RTS) — for seven pairs wins, no stack cleanup needed
+
+**Impact:** Low in practice — seven pairs is a rare winning pattern, so the bug was unlikely to trigger during normal play. But it would cause unpredictable behaviour whenever seven pairs was the winning hand.
+
+**Discovery method:** Code review of `check_win` traced the stack operations through both win paths. The pair-loop path correctly pushes/pops X; the seven pairs path shares `cw_win` but has no matching push.
