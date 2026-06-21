@@ -98,6 +98,16 @@ JMP ai_done              ; only jumps when Y == tmp7
 
 **Fix:** Added `clear_prompt_line` which positions at row 24, clears 39 spaces (not 40 — 40 would cause Mode 7 scrolling), then repositions. All prompt routines now use this instead of `osnewl`, so each prompt overwrites the previous one.
 
+## Sanshoku Infinite Loop
+
+**Problem:** CPU player stuck in infinite loop, game froze. BeebEm debugger showed the CPU cycling endlessly between addresses 0x4E01 and 0x4E48.
+
+**Root cause:** In `check_sanshoku` (SANSHOKU — three identical sequences in different suits), when the cross-suit sequence check failed (pin or sou tiles not found), the code fell through to `cs_no_seq` which did `DEY DEY DEY INY` — a net change of -2. Combined with the 2 INYs that advanced Y to check the sequence, Y always returned to its starting value. For example, with Y starting at 3: advanced to 5, failed check, DEY→4, DEY→3, DEY→2, INY→3 — same as before. Infinite loop.
+
+**Fix:** Changed all 6 `BEQ cs_no_seq` instructions (in both pin and sou checks) to `BEQ cs_next3`. The `cs_next3` path does `DEY DEY INY` (net -1 from the advanced position), correctly advancing Y to the next starting position. Removed the `cs_no_seq` label and its extra DEY.
+
+**Discovery method:** User manually broke into BeebEm debugger when game froze, single-stepped through the code, and shared the trace showing the repeating Y=3→5→3 cycle.
+
 ## Ron Win Detection Rejected by Chombo Check
 
 **Problem:** `dbg_ron_wins` showed 1 but no winner screen appeared — the game showed "Wall Exhausted" instead.
