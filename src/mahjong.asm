@@ -916,9 +916,11 @@ ORG &3000
     LDY disc_tile_val: TYA: TAX
     LDA tile_counts, X: CLC: ADC #1: STA tile_counts, X
     JSR check_win_no_rebuild
+    PHP                      ; save carry (win result) before restore
     ; Restore tile_counts
     LDY disc_tile_val: TYA: TAX
     LDA tile_counts, X: SEC: SBC #1: STA tile_counts, X
+    PLP                      ; restore carry (win result)
     BCS ccmw_valid    ; if check_win_no_rebuild found a win
     ; Invalid win = chombo
     SEC: RTS

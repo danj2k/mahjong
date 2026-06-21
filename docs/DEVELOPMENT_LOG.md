@@ -114,6 +114,8 @@ JMP ai_done              ; only jumps when Y == tmp7
 
 **Root cause:** `check_chombo_win` is called after both Tsumo and Ron detections to verify the win is valid. It calls `check_win`, which rebuilds `tile_counts` from the hand array via `build_tile_counts`. For Tsumo, the drawn tile IS in the hand, so the rebuild works correctly. For Ron, the discarded tile is NOT in the hand — it's in the discard pile — so `check_win` finds no win and `check_chombo_win` returns carry set (invalid win = chombo). The ron win was detected correctly by `check_ron`, then immediately rejected by `check_chombo_win`.
 
-**Fix:** `check_chombo_win` now checks `tsumo_flag`. For Tsumo, it calls `check_win` directly (drawn tile is in hand). For Ron, it temporarily adds `disc_tile_val` to `tile_counts` before calling `check_win`, then restores it afterwards.
+**Fix (first attempt — 753e848):** `check_chombo_win` now checks `tsumo_flag`. For Tsumo, it calls `check_win` directly (drawn tile is in hand). For Ron, it temporarily adds `disc_tile_val` to `tile_counts` before calling `check_win_no_rebuild`, then restores tile_counts afterwards.
 
-**Discovery method:** BeebEm debugger watches showed `dbg_ron_wins = 1` but no winner screen appeared. Traced the code flow from `check_ron` through `check_chombo_win` to find the rejection.
+**Fix (carry flag — e875c5d):** The first attempt had a second bug: the carry flag from `check_win_no_rebuild` was overwritten by the tile_counts restore (`SEC: SBC #1` always set carry for counts ≥ 2). This inverted the result: valid wins were rejected, invalid hands passed. Fixed by adding PHP before the restore and PLP after, preserving the carry across the restore.
+
+**Discovery method:** BeebEm debugger watches showed `dbg_ron_wins = 1` but no winner screen appeared. Traced the code flow from `check_ron` through `check_chombo_win` to find the rejection. Second bug found by code review of the restored carry flag.
