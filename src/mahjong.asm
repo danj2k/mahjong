@@ -3335,14 +3335,18 @@ ORG &3000
 
     ; Standard win failed - check seven pairs
     JSR check_seven_pairs
-    BCS cw_win    ; if check_seven_pairs returned carry set (error/true)
+    BCS cw_win_nopair    ; if check_seven_pairs returned carry set (error/true)
 
     ; Not a winning hand
     CLC
     RTS
 
+.cw_win_nopair
+    SEC
+    RTS
+
 .cw_win
-    PLA                 ; clean up saved X from stack
+    PLA                 ; clean up saved X from pair loop stack entry
     SEC
     RTS
 
