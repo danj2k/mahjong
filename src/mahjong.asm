@@ -402,12 +402,14 @@ ORG &3000
     JSR osnewl
     LDY #0
 .go_pk
-    LDA press_key_str, Y
+    LDA play_again_str, Y
     BEQ go_pk_dn    ; end of string
     JSR oswrch: INY
     JMP go_pk
 .go_pk_dn
     JSR osrdch
+    CMP #'Q': BEQ quit
+    CMP #'q': BEQ quit
     ; Reset game and restart
     JSR game_init
     JSR game_display
@@ -5944,6 +5946,8 @@ ORG &3000
 
 .press_key_str
     EQUS "Press any key...", 0
+.play_again_str
+    EQUS "Press P to play again or Q to quit", 0
 .furiten_msg
     EQUS "FURITEN!", 0
 

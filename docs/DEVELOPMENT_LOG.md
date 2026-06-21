@@ -165,4 +165,33 @@ The extra tiles distorted AI hand evaluation, made win detection less likely (in
 **Discovery:** User reported 6 tiles in hand with 4 open melds displayed on screen. Standard Mahjong dictates 13 - 2*4 = 5 tiles after 4 chiis (at discard point), or 4 tiles after the discard. 6 tiles indicated an extra draw per chii.
 
 **Fix:** Added `skip_draw = 1` in `ep_add_chii`, matching the existing pon and kan code paths.
-**Discovery method:** Code review of `check_win` traced the stack operations through both win paths. The pair-loop path correctly pushes/pops X; the seven pairs path shares `cw_win` but has no matching push.
+
+## Added Kan Tile Display
+
+**Problem:** "Declare Added Kan? (Y/N)" prompt showed garbage instead of the tile name (e.g. should show "Declare Added Kan? (Y/N) 5m").
+
+**Root cause:** `check_added_kan` loaded the tile value from `opn_melds` into A and Y, but never stored it to `tmp8`. The comment at `cak_show` said "tmp8 = tile value from scan. Save it." but the save was never implemented. The display code then read whatever stale value was in `tmp8`.
+
+**Fix:** Added `STA tmp8` after `LDA opn_melds, X` (1 byte added).
+
+## Ron Chombo Carry Flag
+
+**Problem:** Ron wins were always rejected as chombo (invalid win). `dbg_ron_wins` incremented but the player was told "Wall Exhausted" instead of being declared winner.
+
+**Root cause:** In `check_chombo_win`, the carry flag (C=1 for win, C=0 for no win) returned by `check_win_no_rebuild` was destroyed by the tile_counts restore operation (`SEC: SBC #1` always set carry for counts >= 2). Result was inverted: valid wins rejected, invalid hands passed.
+
+**Fix:** Wrapped the restore in PHP/PLP to preserve the carry flag across the tile_counts restore.
+
+## Disc Autoboot Filename
+
+**Problem:** SHIFT+BREAK autoboot failed with "Bad command". Manual `*RUN MAHJONG` worked fine.
+
+**Root cause:** BeebAsm generated a !Boot file containing `*RUN MaJong` (mixed case, missing the 'H') while the binary was saved as `MAHJONG`. DFS uppercases the `*RUN` argument, so it looked for `MAJONG` which doesn't match `MAHJONG`.
+
+**Fix:** Use the correct `executable="MAHJONG"` parameter matching the `SAVE "MAHJONG"` statement in the source. BeebAsm then generates the correct !Boot content with `*RUN MAHJONG` and proper RETURN characters.
+
+## Game Over Screen — Quit Option
+
+**Problem:** The game over screen displayed "Press any key..." with no way to quit back to BASIC. Players had to use the BBC's ESCAPE key to exit.
+
+**Fix:** Changed the game over screen string to "Press P to play again or Q to quit". Any key (including P) restarts the game; Q quits to BASIC. The existing score display still uses the original "Press any key..." string unchanged.
