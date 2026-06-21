@@ -1354,6 +1354,7 @@ ORG &3000
     CMP #1: BNE cak_next ;\ only check pons (type 1)
     INX
     LDA opn_melds, X    ;\ tile value of pon
+    STA tmp8            ;\ save for prompt display
     TAY
     LDA tile_counts, Y
     BEQ cak_next        ;\ player doesn't have it
