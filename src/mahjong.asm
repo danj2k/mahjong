@@ -498,43 +498,72 @@ ORG &3000
 .practice_hint
     TXA: PHA: TYA: PHA
 
-    ; Find best discard: for each unique tile, count wait tiles after removing it
-    LDA #0: STA tmp       ; best_wait_count
-    LDA #0: STA tmp2      ; best_discard_index
+    ; Find best discard using connectivity scoring.
+    ; For each unique tile type present in the hand, score =
+    ;   (count in hand) + (count of adjacent tile-1 in hand)
+    ;                   + (count of adjacent tile+1 in hand)
+    ; Tiles with the LOWEST score are most isolated and best to discard.
+    LDA #$FF: STA tmp     ; best_score (init high so any real score beats it)
+    LDA #0: STA tmp2      ; best_tile_value
+
+    JSR build_tile_counts
 
     LDX #0
 .ph_outer
-    CPX num_tiles: BCS ph_done
-    STX tmp3
+    CPX #TILE_TYPES: BCS ph_done
+    STX tmp3              ; save tile type for later
 
-    ; Build tile counts, then remove one copy of this tile
-    JSR build_tile_counts
-    LDY tmp3
-    LDA hands, Y: TAX
-    LDA tile_counts, X
-    SEC: SBC #1
-    STA tile_counts, X
+    ; Count copies of tile type X in hand
+    LDY #0: STY tmp4
+    LDY num_tiles
+.ph_cnt
+    DEY: BMI ph_cnt_dn
+    LDA hands, Y
+    CMP tmp3: BNE ph_cnt
+    INC tmp4
+    JMP ph_cnt
+.ph_cnt_dn
+    LDA tmp4
+    BEQ ph_next          ; zero copies - skip this tile type
 
-    ; Count unique tile types still present (our wait candidates)
+    ; tmp4 = count of this tile in hand
+
+    ; Check adjacent tile-1 (same suit: man 0-8, pin 9-17, sou 18-26)
+    ; Skip if tile-1 crosses suit boundary: (tile-1) mod 9 == 7 means tile was suit start
+    LDY tmp3: DEY: STY tmp5  ; tmp5 = tile-1 (temp)
+    TYA: AND #7: CMP #7: BEQ ph_adj_hi  ; at suit start, no tile-1 in same suit
     LDY #0: STY tmp6
-    LDX #0
-.ph_inner
-    CPX #TILE_TYPES: BCS ph_inner_dn
-    LDA tile_counts, X
-    BEQ ph_inner_next    ; no tiles of this type - skip
+    LDY num_tiles
+.ph_adj_lo
+    DEY: BMI ph_adj_lo_dn
+    LDA hands, Y
+    CMP tmp5: BNE ph_adj_lo
     INC tmp6
-.ph_inner_next
-    INX: JMP ph_inner
-.ph_inner_dn
-
-    ; Compare with best
-    LDA tmp6
-    CMP tmp: BCC ph_skip
-    BEQ ph_skip    ; zero - condition met
+    JMP ph_adj_lo
+.ph_adj_lo_dn
+    LDA tmp6: CLC: ADC tmp4: STA tmp4
+.ph_adj_hi
+    ; Check adjacent tile+1 (same suit)
+    ; Skip if tile+1 crosses suit boundary: (tile+1) mod 9 == 0 means tile was suit end
+    LDY tmp3: INY: STY tmp5  ; tmp5 = tile+1 (temp)
+    TYA: AND #7: BEQ ph_score_cmp  ; at suit end, no tile+1 in same suit
+    LDY #0: STY tmp6
+    LDY num_tiles
+.ph_adj_hi_lp
+    DEY: BMI ph_adj_hi_dn
+    LDA hands, Y
+    CMP tmp5: BNE ph_adj_hi_lp
+    INC tmp6
+    JMP ph_adj_hi_lp
+.ph_adj_hi_dn
+    LDA tmp6: CLC: ADC tmp4: STA tmp4
+.ph_score_cmp
+    ; Compare score with best
+    LDA tmp4
+    CMP tmp: BCS ph_next
     STA tmp
     LDA tmp3: STA tmp2
-.ph_skip
-    JSR build_tile_counts
+.ph_next
     LDX tmp3
     INX: JMP ph_outer
 
@@ -547,10 +576,11 @@ ORG &3000
     JSR oswrch: INY
     JMP ph_hdr_lp
 .ph_hdr_dn
-    LDX tmp2
-    LDA hands, X
+    ; Print tile number
+    LDA tmp2
     JSR tile_num_char: JSR oswrch
-    LDA hands, X
+    ; Print tile suit
+    LDA tmp2
     JSR tile_suit_char: JSR oswrch
     LDY #0
 .ph_mid_lp
@@ -559,22 +589,20 @@ ORG &3000
     JSR oswrch: INY
     JMP ph_mid_lp
 .ph_mid_dn
+    ; Print score as 1-2 digits
     LDA tmp
-    ; Print wait count as 1-2 digits
     CMP #10: BCS ph_two_digit
     CLC: ADC #'0': JSR oswrch
     LDY #0
     JMP ph_end_lp
 .ph_two_digit
-    ; Divide by 10 for tens digit
     LDY #0
 .ph_div10
     SEC: SBC #10: INY: CMP #10: BCS ph_div10
-    ; A = units, Y = tens
     PHA
-    TYA: CLC: ADC #'0': JSR oswrch  ; tens digit
+    TYA: CLC: ADC #'0': JSR oswrch
     PLA
-    CLC: ADC #'0': JSR oswrch       ; units digit
+    CLC: ADC #'0': JSR oswrch
     LDY #0
 .ph_end_lp
     LDA ph_end_str, Y
@@ -589,9 +617,9 @@ ORG &3000
 .ph_hdr_str
     EQUS "Best discard: ", 0
 .ph_mid_str
-    EQUS " (wait for ", 0
+    EQUS " (score: ", 0
 .ph_end_str
-    EQUS " tiles)", 0
+    EQUS ")", 0
 
 ; =============================================
 ; TURN MANAGEMENT
