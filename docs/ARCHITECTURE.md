@@ -25,7 +25,7 @@ The assembly file is organised into logical sections, each separated by comment 
 
 ### 3. Practice Mode (~lines 489–600)
 
-`practice_hint` evaluates each tile in the human player's hand by temporarily removing it, building tile counts, and calling `check_win`. Shows the best discard and the number of tiles that complete a winning hand.
+`practice_hint` scores each tile type in the human player's hand by connectivity: pairs and sequence neighbours get higher scores, isolated tiles get lower. Recommends discarding the most isolated tile.
 
 ### 4. Game Init & New Round (~lines 601–1650)
 
@@ -83,7 +83,7 @@ All execute routines set `current_player` to the claiming player and set `skip_d
 1. Title line (row 0) — "RIICHI MAHJONG"
 2. Points line (row 1) — all 4 players' scores with riichi/dealer indicators
 3. Human hand (rows 3–5) — tile numbers and suit letters
-4. Practice hint (row 7) — best discard and wait count (if practice mode on)
+4. Practice hint (row 7) — best discard and connectivity score (if practice mode on)
 5. Human discards (row 8) — last 8 discards with meld labels
 6. CPU player areas (rows 10–20) — each showing open melds, discards
 7. Turn indicator (row 21) — "YOUR MOVE" or "CPU P2/P3/P4"

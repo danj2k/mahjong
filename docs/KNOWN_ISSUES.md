@@ -36,7 +36,7 @@ The `first_turn` flag exists in the data section but is never set or checked. Te
 
 **Status:** Works but limited
 
-The practice mode shows the best discard and wait count, but the display area (row 7) is small and can only show one line of hint text. More detailed information (e.g. which yaku are achievable, how many tiles needed for each) would require rethinking the screen layout.
+The practice mode shows the best discard and connectivity score, but the display area (row 7) is small and can only show one line of hint text. More detailed information (e.g. which yaku are achievable, shanten count) would require rethinking the screen layout.
 
 ## Wall Count Display for Values ≥ 100
 

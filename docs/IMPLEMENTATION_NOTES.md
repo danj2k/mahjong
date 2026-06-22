@@ -45,16 +45,15 @@ The title string is fixed at 40 characters (padded with trailing spaces) to prev
 
 ## Practice Mode Hint Algorithm
 
-`practice_hint` evaluates each tile in the human hand by:
-1. Temporarily removing tile at position Y from the hand (shifts remaining tiles left)
-2. Building `tile_counts` from the 13-tile hand
-3. For each tile type in `tile_counts`, trying it as a pair and calling `decompose_melds`
-4. If a winning decomposition is found, incrementing a counter for this position
-5. Restoring the tile (shifts back)
+`practice_hint` scores each tile type in the human hand by connectivity:
+1. For each tile type in the hand, count how many other tiles it is "connected" to
+2. +1 for each matching tile in the hand (pair/triplet potential)
+3. +1 for each adjacent tile-1 in the same suit (sequence left)
+4. +1 for each adjacent tile+1 in the same suit (sequence right)
+5. +3 bonus if the tile belongs to an open meld (already committed to a group)
+6. The tile type with the lowest connectivity score is the most isolated and recommended for discard
 
-The position with the highest count is recommended as the best discard. The count represents how many different tiles would complete a winning hand.
-
-**Performance concern:** This runs on every human turn and evaluates up to 14 positions × 34 tile types × recursive decomposition. On the 2MHz 6502 this may cause a brief pause (~1-2 seconds) which is acceptable for practice mode.
+This replaced the earlier approach which counted winning decomposition paths — that method was biased against pairs because breaking a pair always reduced the number of unique tile types.
 
 ## Key Mapping
 
