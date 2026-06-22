@@ -23,7 +23,7 @@ Each hand begins with 13 tiles dealt to each player. On your turn you draw one t
 **Your turn:**
 - Your tiles are displayed in order from left to right. To discard a tile, press the letter corresponding to its position: **Z** to **M** (bottom row of a QWERTY keyboard) for positions 1 to 7, then **A** to **J** (middle row) for positions 8 to 14
 - If Practice Mode is on, the game will suggest the best discard — press the key shown to discard that tile
-- The hint also shows **"wait for X tiles"** — this is how many tiles remain in the game (in the wall or in opponents' hands) that would complete your winning hand. A higher number means more chances to win after discarding
+- The hint also shows a **connectivity score** — this rates how isolated each tile is. The recommended discard has the lowest score, meaning it is the least connected to the rest of your hand. Higher scores indicate tiles that form or extend pairs and sequences
 - Press **Q** to quit the game
 
 **Between turns:**
@@ -43,7 +43,7 @@ After a win, your hand is scored by counting **han** (bonus points) and **fu** (
 
 When Practice Mode is ON, the game provides helpful guidance on every turn:
 
-- **Best discard recommendation** — shows the optimal tile to discard and how many tiles wait for a win (the "wait for X tiles" count indicates how many different tiles in the remaining wall could complete your hand — a higher count means a better chance of winning)
+- **Best discard recommendation** — shows the optimal tile to discard along with a connectivity score. The score rates how many tiles each type connects to: matching tiles (pairs/triplets) and adjacent tiles in the same suit (sequence potential) each add +1. The recommended discard has the lowest score, indicating the most isolated tile
 - **Yaku breakdown** — after a win, displays each scoring category (han, fu, and point totals)
 
 This is useful for learning mahjong strategy and understanding which yaku are achievable.
